@@ -786,7 +786,7 @@
                         } else if (el.dataset.type === 'date') {
                             const input = document.createElement('input');
                             input.type = 'date';
-                            input.value = el.textContent;
+                            input.value = el.textContent || '';
                             input.className = 'p-1 border rounded w-full';
                             for (const key in el.dataset) input.dataset[key] = el.dataset[key];
                             el.innerHTML = '';
