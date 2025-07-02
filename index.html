@@ -133,7 +133,7 @@
                             <i class="fas fa-plus"></i> Add Project
                         </button>
                         <button id="copy-tracker-report" class="bg-blue-500 text-white px-4 py-2 rounded-lg shadow hover:bg-blue-600 transition duration-300 flex items-center gap-2">
-                            <i class="fas fa-copy"></i> Copy Report
+                            <i class="fas fa-copy exploitation"></i> Copy Report
                         </button>
                     </div>
                 </div>
@@ -246,8 +246,8 @@
                         <input class="w-full px-3 py-2 text-gray-700 border rounded-lg focus:outline-none" type="text" id="new-project-name" placeholder="Project Name" required>
                         <select id="new-project-subphase" class="w-full px-3 py-2 text-gray-700 border rounded-lg focus:outline-none" required></select>
                         <div class="flex gap-4">
-                            <input class="w-1/2 px-3 py-2 text-gray-700 border rounded-lg focus:outline-none" type="date" id="new-project-startDate" required>
-                            <input class="w-1/2 px-3 py-2 text-gray-700 border rounded-lg focus:outline-none" type="date" id="new-project-endDate" required>
+                            <input class="w-1/2 px-3 py-2 text-gray-700 border rounded-lg focus:outline-none" type="date" id="new-project-startDate">
+                            <input class="w-1/2 px-3 py-2 text-gray-700 border rounded-lg focus:outline-none" type="date" id="new-project-endDate">
                         </div>
                         <select id="new-project-assignedTo" class="w-full px-3 py-2 text-gray-700 border rounded-lg focus:outline-none" required></select>
                         <select id="new-project-status" class="w-full px-3 py-2 text-gray-700 border rounded-lg focus:outline-none" required></select>
@@ -828,7 +828,7 @@
             const field = editable.dataset.field;
             let value = isSelect ? target.value : isInput ? target.value : target.textContent.trim();
 
-            if (!value && !['actualCompDate'].includes(field)) {
+            if (!value && !['actualCompDate', 'startDate', 'endDate'].includes(field)) {
                 showToast('Field cannot be empty', 'error');
                 return;
             }
@@ -940,7 +940,7 @@
             try {
                 const startDate = document.getElementById('new-project-startDate').value;
                 const endDate = document.getElementById('new-project-endDate').value;
-                if (new Date(endDate) < new Date(startDate)) {
+                if (startDate && endDate && new Date(endDate) < new Date(startDate)) {
                     showToast('End date cannot be before start date', 'error');
                     return;
                 }
@@ -959,14 +959,16 @@
                 const { data: user } = await supabase.from('users').select('id').eq('name', assignedToName).single();
                 const { data: status } = await supabase.from('statuses').select('id').eq('name', statusName).single();
 
-                const { error } = await supabase.from('projects').insert({
+                const insertData = {
                     project: projectName,
                     sub_phase_id: subPhase?.id,
                     assigned_to_id: user?.id,
-                    status_id: status?.id,
-                    start_date: startDate,
-                    end_date: endDate
-                });
+                    status_id: status?.id
+                };
+                if (startDate) insertData.start_date = startDate;
+                if (endDate) insertData.end_date = endDate;
+
+                const { error } = await supabase.from('projects').insert(insertData);
                 if (error) {
                     showToast(`Error adding project: ${error.message}`, 'error');
                     return;
