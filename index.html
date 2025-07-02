@@ -133,7 +133,7 @@
                             <i class="fas fa-plus"></i> Add Project
                         </button>
                         <button id="copy-tracker-report" class="bg-blue-500 text-white px-4 py-2 rounded-lg shadow hover:bg-blue-600 transition duration-300 flex items-center gap-2">
-                            <i class="fas fa-copy exploitation"></i> Copy Report
+                            <i class="fas fa-copy"></i> Copy Report
                         </button>
                     </div>
                 </div>
@@ -476,8 +476,8 @@
                         <td class="px-6 py-4">
                             <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${getStatusColor(proj.status)} editable" data-table="projects" data-id="${proj.id}" data-field="status" data-type="select">${proj.status}</span>
                         </td>
-                        <td class="px-6 py-4 editable" data-table="projects" data-id="${proj.id}" data-field="startDate" data-type="date">${proj.startDate}</td>
-                        <td class="px-6 py-4 editable" data-table="projects" data-id="${proj.id}" data-field="endDate" data-type="date">${proj.endDate}</td>
+                        <td class="px-6 py-4 editable" data-table="projects" data-id="${proj.id}" data-field="startDate" data-type="date">${proj.startDate || ''}</td>
+                        <td class="px-6 py-4 editable" data-table="projects" data-id="${proj.id}" data-field="endDate" data-type="date">${proj.endDate || ''}</td>
                     `;
                     tbody.appendChild(row);
                 });
@@ -705,8 +705,8 @@
                         <td class="px-4 py-4 editable" data-table="qa_summary" data-id="${item.id}" data-field="pc">${item.pc}</td>
                         <td class="px-4 py-4 editable" data-table="qa_summary" data-id="${item.id}" data-field="assignedTo" data-type="select">${item.assignedTo}</td>
                         <td class="px-4 py-4"><span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${getStatusColor(item.status)} editable" data-table="qa_summary" data-id="${item.id}" data-field="status" data-type="select">${item.status}</span></td>
-                        <td class="px-4 py-4 editable" data-table="qa_summary" data-id="${item.id}" data-field="startDate" data-type="date">${item.startDate}</td>
-                        <td class="px-4 py-4 editable" data-table="qa_summary" data-id="${item.id}" data-field="endDate" data-type="date">${item.endDate}</td>
+                        <td class="px-4 py-4 editable" data-table="qa_summary" data-id="${item.id}" data-field="startDate" data-type="date">${item.startDate || ''}</td>
+                        <td class="px-4 py-4 editable" data-table="qa_summary" data-id="${item.id}" data-field="endDate" data-type="date">${item.endDate || ''}</td>
                         <td class="px-4 py-4 editable" data-table="qa_summary" data-id="${item.id}" data-field="actualCompDate" data-type="date">${item.actualCompDate || ''}</td>
                     `;
                     qaBody.appendChild(row);
@@ -848,7 +848,7 @@
                     const { data: project } = await supabase.from('projects').select('id').eq('project', value).single();
                     updateData['project_id'] = project?.id;
                 } else {
-                    updateData[field.toLowerCase()] = value;
+                    updateData[field.toLowerCase()] = value || null; // Allow null for date fields
                 }
 
                 const { error } = await supabase.from(table).update(updateData).eq('id', id);
@@ -963,10 +963,10 @@
                     project: projectName,
                     sub_phase_id: subPhase?.id,
                     assigned_to_id: user?.id,
-                    status_id: status?.id
+                    status_id: status?.id,
+                    start_date: startDate || null,
+                    end_date: endDate || null
                 };
-                if (startDate) insertData.start_date = startDate;
-                if (endDate) insertData.end_date = endDate;
 
                 const { error } = await supabase.from('projects').insert(insertData);
                 if (error) {
