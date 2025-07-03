@@ -354,26 +354,6 @@
             }));
         }
 
-        async function fetchScheduleStatuses() {
-            const { data, error } = await supabase
-                .from('schedule_status')
-                .select(`
-                    id, date, project_id,
-                    statuses(name)
-                `);
-            if (error) {
-                showToast('Error fetching schedule statuses: ' + error.message, 'error');
-                console.error(error);
-                return [];
-            }
-            return data.map(s => ({
-                id: s.id,
-                projectId: s.project_id,
-                date: s.date,
-                status: s.statuses?.name || 'Yet to Start'
-            }));
-        }
-
         async function fetchQASummary() {
             const { data, error } = await supabase
                 .from('qa_summary')
@@ -484,7 +464,7 @@
             const tbody = document.getElementById('project-tracker-body');
             tbody.innerHTML = '<tr><td colspan="6" class="text-center py-4">Loading...</td></tr>';
             try {
-                const projects = (await fetchProjects()).filter(p => !['Completed', 'Rejected'].includes(p.status));
+                const projects = (await fetchProjects()).filter(p => p.status !== 'Completed');
                 tbody.innerHTML = '';
                 projects.sort((a, b) => new Date(a.startDate) - new Date(b.startDate)).forEach(proj => {
                     const row = document.createElement('tr');
@@ -514,24 +494,21 @@
             try {
                 const filterDate = document.getElementById('schedule-date-filter').value;
                 const filterQA = document.getElementById('schedule-qa-filter').value;
-                const [projects, scheduleStatuses] = await Promise.all([fetchProjects(), fetchScheduleStatuses()]);
+                const projects = await fetchProjects();
                 const scheduleItems = [];
 
-                // Create schedule items based on project dates
+                // Create schedule items based on project dates and statuses
                 projects.forEach(proj => {
                     if (!proj.startDate || !proj.endDate) return;
                     let currentDate = new Date(proj.startDate);
                     const endDate = new Date(proj.endDate);
                     while (currentDate <= endDate) {
-                        const dateStr = currentDate.toISOString().split('T')[0];
-                        const statusEntry = scheduleStatuses.find(s => s.projectId === proj.id && s.date === dateStr);
                         scheduleItems.push({
-                            date: dateStr,
+                            date: currentDate.toISOString().split('T')[0],
                             project: proj.project,
-                            projectId: proj.id,
-                            scheduleStatusId: statusEntry?.id || null,
+                            projectId: proj.id, // Store project ID for updates
                             assignedTo: proj.assignedTo,
-                            status: statusEntry?.status || 'Yet to Start'
+                            status: proj.status // Use the project's status directly
                         });
                         currentDate.setDate(currentDate.getDate() + 1);
                     }
@@ -574,7 +551,7 @@
                             <td class="px-6 py-4">${item.assignedTo}</td>
                             <td class="px-6 py-4 font-medium text-gray-900">${item.project}</td>
                             <td class="px-6 py-4">
-                                <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${getStatusColor(item.status)} editable" data-table="schedule_status" data-id="${item.scheduleStatusId || ''}" data-project-id="${item.projectId}" data-date="${item.date}" data-field="status" data-type="select">${item.status}</span>
+                                <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${getStatusColor(item.status)} editable" data-table="projects" data-id="${item.projectId}" data-field="status" data-type="select">${item.status}</span>
                             </td>
                         `;
                         tbody.appendChild(row);
@@ -607,7 +584,7 @@
                     dateSelect.appendChild(option);
                 });
 
-                applyEditMode();
+                applyEditMode(); // Apply edit mode to ensure status dropdowns are rendered
             } catch (e) {
                 container.innerHTML = '<p class="text-center py-4 text-red-600">Error loading schedule</p>';
                 console.error(e);
@@ -850,8 +827,6 @@
 
             const table = editable.dataset.table;
             const id = editable.dataset.id;
-            const projectId = editable.dataset.projectId;
-            const date = editable.dataset.date;
             const field = editable.dataset.field;
             let value = isSelect ? target.value : isInput ? target.value : target.textContent.trim();
 
@@ -860,72 +835,51 @@
                 return;
             }
 
+            let updateData = {};
             try {
-                if (table === 'schedule_status') {
+                if (field === 'subPhase') {
+                    const { data: subPhase } = await supabase.from('sub_phases').select('id').eq('name', value).single();
+                    updateData['sub_phase_id'] = subPhase?.id;
+                } else if (field === 'assignedTo' || field === 'resource') {
+                    const { data: user } = await supabase.from('users').select('id').eq('name', value).single();
+                    updateData[field === 'assignedTo' ? 'assigned_to_id' : 'resource_id'] = user?.id;
+                } else if (field === 'status') {
                     const { data: status } = await supabase.from('statuses').select('id').eq('name', value).single();
-                    let updateData = { project_id: projectId, date, status_id: status?.id };
-                    let error;
-
-                    if (id) {
-                        // Update existing schedule status
-                        ({ error } = await supabase.from('schedule_status').update({ status_id: status?.id }).eq('id', id));
-                    } else {
-                        // Insert new schedule status
-                        ({ error } = await supabase.from('schedule_status').insert(updateData));
-                    }
-
-                    if (error) {
-                        showToast(`Error updating schedule status: ${error.message}`, 'error');
-                        return;
-                    }
-                    showToast('Schedule status updated successfully!');
-                    renderWorkSchedule();
+                    updateData['status_id'] = status?.id;
+                } else if (field === 'project' || field === 'projectName') {
+                    const { data: project } = await supabase.from('projects').select('id').eq('project', value).single();
+                    updateData['project_id'] = project?.id;
                 } else {
-                    let updateData = {};
-                    if (field === 'subPhase') {
-                        const { data: subPhase } = await supabase.from('sub_phases').select('id').eq('name', value).single();
-                        updateData['sub_phase_id'] = subPhase?.id;
-                    } else if (field === 'assignedTo' || field === 'resource') {
-                        const { data: user } = await supabase.from('users').select('id').eq('name', value).single();
-                        updateData[field === 'assignedTo' ? 'assigned_to_id' : 'resource_id'] = user?.id;
-                    } else if (field === 'status') {
-                        const { data: status } = await supabase.from('statuses').select('id').eq('name', value).single();
-                        updateData['status_id'] = status?.id;
-                    } else if (field === 'project' || field === 'projectName') {
-                        const { data: project } = await supabase.from('projects').select('id').eq('project', value).single();
-                        updateData['project_id'] = project?.id;
-                    } else {
-                        updateData[field.toLowerCase()] = value || null;
-                    }
-
-                    const { error } = await supabase.from(table).update(updateData).eq('id', id);
-                    if (error) {
-                        showToast(`Error updating ${field}: ${error.message}`, 'error');
-                        return;
-                    }
-
-                    if (table === 'projects' && field === 'status' && value === 'Completed') {
-                        const { error: compError } = await supabase
-                            .from('projects')
-                            .update({ actual_comp_date: new Date().toISOString().split('T')[0] })
-                            .eq('id', id);
-                        if (compError) {
-                            showToast(`Error setting completion date: ${compError.message}`, 'error');
-                        } else {
-                            await updateQASummary({ id, project: (await fetchProjects()).find(p => p.id === id) });
-                        }
-                    }
-                    if (table === 'qa_summary' && field === 'status' && value === 'Completed') {
-                        const { error: compError } = await supabase
-                            .from('qa_summary')
-                            .update({ actual_comp_date: new Date().toISOString().split('T')[0] })
-                            .eq('id', id);
-                        if (compError) showToast(`Error setting completion date: ${compError.message}`, 'error');
-                    }
-
-                    showToast(`${field} updated successfully!`);
-                    renderAllTabs();
+                    updateData[field.toLowerCase()] = value || null; // Allow null for date fields
                 }
+
+                const { error } = await supabase.from(table).update(updateData).eq('id', id);
+                if (error) {
+                    showToast(`Error updating ${field}: ${error.message}`, 'error');
+                    return;
+                }
+
+                if (table === 'projects' && field === 'status' && value === 'Completed') {
+                    const { error: compError } = await supabase
+                        .from('projects')
+                        .update({ actual_comp_date: new Date().toISOString().split('T')[0] })
+                        .eq('id', id);
+                    if (compError) {
+                        showToast(`Error setting completion date: ${compError.message}`, 'error');
+                    } else {
+                        await updateQASummary({ id, project: (await fetchProjects()).find(p => p.id === id) });
+                    }
+                }
+                if (table === 'qa_summary' && field === 'status' && value === 'Completed') {
+                    const { error: compError } = await supabase
+                        .from('qa_summary')
+                        .update({ actual_comp_date: new Date().toISOString().split('T')[0] })
+                        .eq('id', id);
+                    if (compError) showToast(`Error setting completion date: ${compError.message}`, 'error');
+                }
+
+                showToast(`${field} updated successfully!`);
+                renderAllTabs();
             } catch (e) {
                 showToast(`Error updating ${field}`, 'error');
                 console.error(e);
@@ -1016,30 +970,10 @@
                     end_date: endDate || null
                 };
 
-                const { data: newProject, error } = await supabase.from('projects').insert(insertData).select('id').single();
+                const { error } = await supabase.from('projects').insert(insertData);
                 if (error) {
                     showToast(`Error adding project: ${error.message}`, 'error');
                     return;
-                }
-
-                // Insert default schedule statuses for each date
-                if (startDate && endDate) {
-                    let currentDate = new Date(startDate);
-                    const end = new Date(endDate);
-                    const scheduleInserts = [];
-                    const { data: defaultStatus } = await supabase.from('statuses').select('id').eq('name', 'Yet to Start').single();
-                    while (currentDate <= end) {
-                        scheduleInserts.push({
-                            project_id: newProject.id,
-                            date: currentDate.toISOString().split('T')[0],
-                            status_id: defaultStatus?.id
-                        });
-                        currentDate.setDate(currentDate.getDate() + 1);
-                    }
-                    const { error: scheduleError } = await supabase.from('schedule_status').insert(scheduleInserts);
-                    if (scheduleError) {
-                        showToast(`Error adding schedule statuses: ${scheduleError.message}`, 'error');
-                    }
                 }
 
                 closeModal(addProjectModal);
