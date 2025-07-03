@@ -497,17 +497,18 @@
                 const projects = await fetchProjects();
                 const scheduleItems = [];
 
+                // Create schedule items based on project dates and statuses
                 projects.forEach(proj => {
                     if (!proj.startDate || !proj.endDate) return;
                     let currentDate = new Date(proj.startDate);
                     const endDate = new Date(proj.endDate);
                     while (currentDate <= endDate) {
-                        const status = proj.status === 'Completed' && proj.actualCompDate === currentDate.toISOString().split('T')[0] ? 'Completed' : 'Pending';
                         scheduleItems.push({
                             date: currentDate.toISOString().split('T')[0],
                             project: proj.project,
+                            projectId: proj.id, // Store project ID for updates
                             assignedTo: proj.assignedTo,
-                            status
+                            status: proj.status // Use the project's status directly
                         });
                         currentDate.setDate(currentDate.getDate() + 1);
                     }
@@ -550,7 +551,7 @@
                             <td class="px-6 py-4">${item.assignedTo}</td>
                             <td class="px-6 py-4 font-medium text-gray-900">${item.project}</td>
                             <td class="px-6 py-4">
-                                <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${getStatusColor(item.status)}">${item.status}</span>
+                                <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${getStatusColor(item.status)} editable" data-table="projects" data-id="${item.projectId}" data-field="status" data-type="select">${item.status}</span>
                             </td>
                         `;
                         tbody.appendChild(row);
@@ -582,13 +583,14 @@
                     if (date === currentDate) option.selected = true;
                     dateSelect.appendChild(option);
                 });
+
+                applyEditMode(); // Apply edit mode to ensure status dropdowns are rendered
             } catch (e) {
                 container.innerHTML = '<p class="text-center py-4 text-red-600">Error loading schedule</p>';
                 console.error(e);
             }
         }
 
-        // --- Copy Report Functions ---
         async function copyTrackerReport() {
             const tbody = document.getElementById('project-tracker-body');
             let text = 'Project Tracker Report:\n';
