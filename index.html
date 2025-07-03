@@ -988,8 +988,14 @@
             try {
                 const startDate = document.getElementById('new-project-startDate').value;
                 const endDate = document.getElementById('new-project-endDate').value;
+                const today = new Date().toISOString().split('T')[0];
+
                 if (startDate && endDate && new Date(endDate) < new Date(startDate)) {
                     showToast('End date cannot be before start date', 'error');
+                    return;
+                }
+                if (startDate && new Date(startDate) < new Date(today)) {
+                    showToast('Start date cannot be in the past', 'error');
                     return;
                 }
                 const projectName = document.getElementById('new-project-name').value.trim();
@@ -1039,6 +1045,7 @@
                     const { error: scheduleError } = await supabase.from('schedule_status').insert(scheduleInserts);
                     if (scheduleError) {
                         showToast(`Error adding schedule statuses: ${scheduleError.message}`, 'error');
+                        return;
                     }
                 }
 
