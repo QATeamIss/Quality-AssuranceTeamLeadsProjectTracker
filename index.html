@@ -85,6 +85,13 @@
             background-color: #f9fafb;
             border-bottom: 2px solid #d1d5db;
         }
+        button, a.tab-link {
+            cursor: pointer;
+        }
+        button:disabled {
+            cursor: not-allowed;
+            opacity: 0.5;
+        }
     </style>
 </head>
 <body class="text-gray-800">
@@ -320,7 +327,10 @@
         // --- Toast Notification ---
         function showToast(message, type = 'success') {
             const toastContainer = document.getElementById('toast-container');
-            if (!toastContainer) return;
+            if (!toastContainer) {
+                console.error('Toast container not found');
+                return;
+            }
             const toast = document.createElement('div');
             toast.className = `toast ${type}`;
             toast.innerHTML = `<i class="fas ${type === 'success' ? 'fa-check-circle' : 'fa-times-circle'}"></i> ${message}`;
@@ -356,6 +366,10 @@
                         statuses(name)
                     `);
                 if (error) throw error;
+                if (!data || data.length === 0) {
+                    showToast('No projects found in database', 'error');
+                    return [];
+                }
 
                 const projectsWithAssignees = await Promise.all(data.map(async (p) => {
                     const { data: assignees, error: assigneeError } = await supabase
@@ -540,6 +554,10 @@
             try {
                 const projects = (await fetchProjects()).filter(p => !['Completed', 'Rejected'].includes(p.status));
                 tbody.innerHTML = '';
+                if (projects.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="11" class="text-center py-4">No active projects found</td></tr>';
+                    return;
+                }
                 projects.sort((a, b) => new Date(a.startDate) - new Date(b.startDate)).forEach(proj => {
                     const row = document.createElement('tr');
                     row.className = 'bg-white';
@@ -623,6 +641,10 @@
                 });
 
                 container.innerHTML = '';
+                if (Object.keys(groupedByDate).length === 0) {
+                    container.innerHTML = '<p class="text-center py-4">No schedule data available</p>';
+                    return;
+                }
                 Object.keys(groupedByDate).sort().forEach(date => {
                     const dateSection = document.createElement('div');
                     dateSection.className = 'mb-6';
@@ -698,7 +720,7 @@
             let text = 'Project Tracker Report:\n';
             Array.from(tbody.querySelectorAll('tr')).forEach(row => {
                 const cells = row.querySelectorAll('td');
-                text += `Project: ${cells[0].textContent}, Sub Phase: ${cells[1].textContent}, Assigned To: ${cells[2].textContent}, Status: ${cells[3].textContent}, Start: ${cells[4].textContent}, End: ${cells[5].textContent}, Actual Comp.: ${cells[6].textContent}, Comments: ${cells[7].textContent}, Bug Count: ${cells[8].textContent}, Deviated: ${cells[9].textContent}, Deviation Reason: ${cells[10].textContent}\n`;
+                text += `Project: ${cells[0]?.textContent || ''}, Sub Phase: ${cells[1]?.textContent || ''}, Assigned To: ${cells[2]?.textContent || ''}, Status: ${cells[3]?.textContent || ''}, Start: ${cells[4]?.textContent || ''}, End: ${cells[5]?.textContent || ''}, Actual Comp.: ${cells[6]?.textContent || ''}, Comments: ${cells[7]?.textContent || ''}, Bug Count: ${cells[8]?.textContent || ''}, Deviated: ${cells[9]?.textContent || ''}, Deviation Reason: ${cells[10]?.textContent || ''}\n`;
             });
             try {
                 if (window.html2canvas) {
@@ -734,7 +756,7 @@
             elementsToCapture.forEach(div => {
                 Array.from(div.querySelectorAll('tbody tr')).forEach(row => {
                     const cells = row.querySelectorAll('td');
-                    text += `Date: ${cells[0].textContent}, QA: ${cells[1].textContent}, Project: ${cells[2].textContent}, Status: ${cells[3].textContent}\n`;
+                    text += `Date: ${cells[0]?.textContent || ''}, QA: ${cells[1]?.textContent || ''}, Project: ${cells[2]?.textContent || ''}, Status: ${cells[3]?.textContent || ''}\n`;
                 });
             });
 
@@ -772,6 +794,10 @@
             try {
                 const issues = await fetchIssuesLog();
                 container.innerHTML = '';
+                if (issues.length === 0) {
+                    container.innerHTML = '<p class="text-center py-4">No issues found</p>';
+                    return;
+                }
                 issues.forEach(issue => {
                     const card = document.createElement('div');
                     card.className = 'bg-white p-5 rounded-xl shadow-lg';
@@ -821,39 +847,47 @@
                 `;
 
                 qaBody.innerHTML = '';
-                qaSummary.forEach(item => {
-                    const row = document.createElement('tr');
-                    row.className = 'bg-white';
-                    row.innerHTML = `
-                        <td class="px-4 py-4 editable" data-table="qa_summary" data-id="${item.id}" data-field="projectName" data-type="select">${item.projectName}</td>
-                        <td class="px-4 py-4 editable" data-table="qa_summary" data-id="${item.id}" data-field="subPhase" data-type="select">${item.subPhase}</td>
-                        <td class="px-4 py-4 editable" data-table="qa_summary" data-id="${item.id}" data-field="pc">${item.pc}</td>
-                        <td class="px-4 py-4 editable" data-table="qa_summary" data-id="${item.id}" data-field="assignedTo" data-type="select">${item.assignedTo}</td>
-                        <td class="px-4 py-4"><span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${getStatusColor(item.status)} editable" data-table="qa_summary" data-id="${item.id}" data-field="status" data-type="select">${item.status}</span></td>
-                        <td class="px-4 py-4 editable" data-table="qa_summary" data-id="${item.id}" data-field="startDate" data-type="date">${item.startDate || ''}</td>
-                        <td class="px-4 py-4 editable" data-table="qa_summary" data-id="${item.id}" data-field="endDate" data-type="date">${item.endDate || ''}</td>
-                        <td class="px-4 py-4 editable" data-table="qa_summary" data-id="${item.id}" data-field="actualCompDate" data-type="date">${item.actualCompDate || ''}</td>
-                    `;
-                    qaBody.appendChild(row);
-                });
+                if (qaSummary.length === 0) {
+                    qaBody.innerHTML = '<tr><td colspan="8" class="text-center py-4">No QA summary data</td></tr>';
+                } else {
+                    qaSummary.forEach(item => {
+                        const row = document.createElement('tr');
+                        row.className = 'bg-white';
+                        row.innerHTML = `
+                            <td class="px-4 py-4 editable" data-table="qa_summary" data-id="${item.id}" data-field="projectName" data-type="select">${item.projectName}</td>
+                            <td class="px-4 py-4 editable" data-table="qa_summary" data-id="${item.id}" data-field="subPhase" data-type="select">${item.subPhase}</td>
+                            <td class="px-4 py-4 editable" data-table="qa_summary" data-id="${item.id}" data-field="pc">${item.pc}</td>
+                            <td class="px-4 py-4 editable" data-table="qa_summary" data-id="${item.id}" data-field="assignedTo" data-type="select">${item.assignedTo}</td>
+                            <td class="px-4 py-4"><span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${getStatusColor(item.status)} editable" data-table="qa_summary" data-id="${item.id}" data-field="status" data-type="select">${item.status}</span></td>
+                            <td class="px-4 py-4 editable" data-table="qa_summary" data-id="${item.id}" data-field="startDate" data-type="date">${item.startDate || ''}</td>
+                            <td class="px-4 py-4 editable" data-table="qa_summary" data-id="${item.id}" data-field="endDate" data-type="date">${item.endDate || ''}</td>
+                            <td class="px-4 py-4 editable" data-table="qa_summary" data-id="${item.id}" data-field="actualCompDate" data-type="date">${item.actualCompDate || ''}</td>
+                        `;
+                        qaBody.appendChild(row);
+                    });
+                }
 
                 perfBody.innerHTML = '';
-                performanceMetrics.forEach(item => {
-                    const row = document.createElement('tr');
-                    row.className = 'bg-white';
-                    const deviationClass = item.deviation && (item.deviation.includes('>') || parseFloat(item.deviation) > 0) ? 'bg-red-200 text-red-900 font-bold' : '';
-                    row.innerHTML = `
-                        <td class="px-4 py-4 editable" data-table="performance_metrics" data-id="${item.id}" data-field="project" data-type="select">${item.project}</td>
-                        <td class="px-4 py-4 editable" data-table="performance_metrics" data-id="${item.id}" data-field="resource" data-type="select">${item.resource}</td>
-                        <td class="px-4 py-4 editable" data-table="performance_metrics" data-id="${item.id}" data-field="phase" data-type="select">${item.phase}</td>
-                        <td class="px-4 py-4 editable" data-table="performance_metrics" data-id="${item.id}" data-field="startDate" data-type="date">${item.startDate}</td>
-                        <td class="px-4 py-4 editable" data-table="performance_metrics" data-id="${item.id}" data-field="timeTaken">${item.timeTaken}</td>
-                        <td class="px-4 py-4 ${deviationClass} editable" data-table="performance_metrics" data-id="${item.id}" data-field="deviation">${item.deviation}</td>
-                        <td class="px-4 py-4 editable" data-table="performance_metrics" data-id="${item.id}" data-field="sprint">${item.sprint}</td>
-                        <td class="px-4 py-4 editable" data-table="performance_metrics" data-id="${item.id}" data-field="bugCount">${item.bugCount}</td>
-                    `;
-                    perfBody.appendChild(row);
-                });
+                if (performanceMetrics.length === 0) {
+                    perfBody.innerHTML = '<tr><td colspan="8" class="text-center py-4">No performance metrics data</td></tr>';
+                } else {
+                    performanceMetrics.forEach(item => {
+                        const row = document.createElement('tr');
+                        row.className = 'bg-white';
+                        const deviationClass = item.deviation && (item.deviation.includes('>') || parseFloat(item.deviation) > 0) ? 'bg-red-200 text-red-900 font-bold' : '';
+                        row.innerHTML = `
+                            <td class="px-4 py-4 editable" data-table="performance_metrics" data-id="${item.id}" data-field="project" data-type="select">${item.project}</td>
+                            <td class="px-4 py-4 editable" data-table="performance_metrics" data-id="${item.id}" data-field="resource" data-type="select">${item.resource}</td>
+                            <td class="px-4 py-4 editable" data-table="performance_metrics" data-id="${item.id}" data-field="phase" data-type="select">${item.phase}</td>
+                            <td class="px-4 py-4 editable" data-table="performance_metrics" data-id="${item.id}" data-field="startDate" data-type="date">${item.startDate}</td>
+                            <td class="px-4 py-4 editable" data-table="performance_metrics" data-id="${item.id}" data-field="timeTaken">${item.timeTaken}</td>
+                            <td class="px-4 py-4 ${deviationClass} editable" data-table="performance_metrics" data-id="${item.id}" data-field="deviation">${item.deviation}</td>
+                            <td class="px-4 py-4 editable" data-table="performance_metrics" data-id="${item.id}" data-field="sprint">${item.sprint}</td>
+                            <td class="px-4 py-4 editable" data-table="performance_metrics" data-id="${item.id}" data-field="bugCount">${item.bugCount}</td>
+                        `;
+                        perfBody.appendChild(row);
+                    });
+                }
 
                 const statusCounts = projects.reduce((acc, p) => {
                     acc[p.status] = (acc[p.status] || 0) + 1;
@@ -1119,13 +1153,8 @@
             }
         }
 
-        document.getElementById('add-project-btn')?.addEventListener('click', () => openModal(addProjectModal));
-        document.getElementById('add-issue-btn')?.addEventListener('click', () => openModal(addIssueModal));
-        document.getElementById('cancel-project-btn')?.addEventListener('click', () => closeModal(addProjectModal));
-        document.getElementById('cancel-issue-btn')?.addEventListener('click', () => closeModal(addIssueModal));
-
         // --- Form Submissions ---
-        document.getElementById('add-project-form')?.addEventListener('submit', async e => {
+        async function handleAddProject(e) {
             e.preventDefault();
             try {
                 const startDate = document.getElementById('new-project-startDate').value;
@@ -1203,10 +1232,9 @@
                 showToast('Error adding project: ' + e.message, 'error');
                 console.error('Add project error:', e);
             }
-        });
+        }
 
-        document.getElementById('submit-project-btn')?.addEventListener('click', () => document.getElementById('add-project-form')?.requestSubmit());
-        document.getElementById('add-issue-form')?.addEventListener('submit', async e => {
+        async function handleAddIssue(e) {
             e.preventDefault();
             try {
                 const projectName = document.getElementById('new-issue-project-name').value;
@@ -1228,9 +1256,7 @@
                 showToast('Error adding issue: ' + e.message, 'error');
                 console.error('Add issue error:', e);
             }
-        });
-
-        document.getElementById('submit-issue-btn')?.addEventListener('click', () => document.getElementById('add-issue-form')?.requestSubmit());
+        }
 
         // --- Populate Modal Dropdowns ---
         async function populateModalDropdowns() {
@@ -1298,54 +1324,175 @@
         }
 
         // --- Render All Tabs ---
+       javascript
+
+
+
+
+// --- Render All Tabs ---
         async function renderAllTabs() {
             try {
-                await Promise.all([
-                    renderProjectTracker(),
-                    renderWorkSchedule(),
-                    renderIssuesLog(),
-                    renderSummary()
-                ]);
+                const activeTab = document.querySelector('.tab-link.active').dataset.tab;
+                if (activeTab === 'tracker') await renderProjectTracker();
+                else if (activeTab === 'schedule') await renderWorkSchedule();
+                else if (activeTab === 'coordinator') await renderIssuesLog();
+                else if (activeTab === 'summary') await renderSummary();
             } catch (e) {
                 showToast('Error rendering tabs: ' + e.message, 'error');
                 console.error('Render all tabs error:', e);
             }
         }
 
-        // --- Load html2canvas with Retry ---
-        async function loadHtml2Canvas(retryCount = 3, delay = 1000) {
-            if (window.html2canvas) {
-                init();
-                return;
-            }
-            const script = document.createElement('script');
-            script.src = "https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js";
-            script.async = true;
-            script.onload = init;
-            script.onerror = async () => {
-                if (retryCount > 0) {
-                    showToast(`Retrying html2canvas load (${retryCount} attempts left)`, 'error');
-                    await new Promise(resolve => setTimeout(resolve, delay));
-                    loadHtml2Canvas(retryCount - 1, delay * 2);
-                } else {
-                    showToast('Failed to load html2canvas after retries', 'error');
-                    init(); // Proceed without html2canvas
-                }
-            };
-            document.body.appendChild(script);
-        }
-
-        // --- Initialization ---
-        async function init() {
+        // --- Event Listeners ---
+        function setupEventListeners() {
             try {
-                document.querySelectorAll('.tab-link').forEach(tab => {
-                    tab.removeEventListener('click', switchTab);
+                // Tab switching
+                const tabLinks = document.querySelectorAll('.tab-link');
+                tabLinks.forEach(tab => {
+                    tab.removeEventListener('click', switchTab); // Prevent duplicate listeners
                     tab.addEventListener('click', switchTab);
                 });
 
-                document.getElementById('toggle-edit-mode')?.addEventListener('click', () => {
-                    isEditMode = !isEditMode;
-                    const toggleButton = document.getElementById('toggle-edit-mode');
-                    const editModeText = document.getElementById('edit-mode-text');
-                    if (toggleButton && editModeText) {
-                        editModeText.textContent = isEditMode ? 'View Mode' : 'Toggle Edit Mode';
+                // Edit mode toggle
+                const toggleEditButton = document.getElementById('toggle-edit-mode');
+                if (toggleEditButton) {
+                    toggleEditButton.addEventListener('click', () => {
+                        isEditMode = !isEditMode;
+                        document.getElementById('edit-mode-text').textContent = isEditMode ? 'Exit Edit Mode' : 'Toggle Edit Mode';
+                        document.getElementById('save-btn').disabled = !isEditMode;
+                        applyEditMode();
+                    });
+                }
+
+                // Save changes
+                const saveButton = document.getElementById('save-btn');
+                if (saveButton) {
+                    saveButton.disabled = !isEditMode;
+                    saveButton.addEventListener('click', async () => {
+                        try {
+                            showToast('Changes saved successfully!');
+                            isEditMode = false;
+                            document.getElementById('edit-mode-text').textContent = 'Toggle Edit Mode';
+                            saveButton.disabled = true;
+                            applyEditMode();
+                            await renderAllTabs();
+                        } catch (e) {
+                            showToast('Error saving changes: ' + e.message, 'error');
+                            console.error('Save changes error:', e);
+                        }
+                    });
+                }
+
+                // Add project
+                const addProjectButton = document.getElementById('add-project-btn');
+                if (addProjectButton) {
+                    addProjectButton.addEventListener('click', () => openModal(addProjectModal));
+                }
+
+                // Copy tracker report
+                const copyTrackerButton = document.getElementById('copy-tracker-report');
+                if (copyTrackerButton) {
+                    copyTrackerButton.addEventListener('click', copyTrackerReport);
+                }
+
+                // Copy schedule report
+                const copyScheduleButton = document.getElementById('copy-schedule-report');
+                if (copyScheduleButton) {
+                    copyScheduleButton.addEventListener('click', copyScheduleReport);
+                }
+
+                // Add issue
+                const addIssueButton = document.getElementById('add-issue-btn');
+                if (addIssueButton) {
+                    addIssueButton.addEventListener('click', () => openModal(addIssueModal));
+                }
+
+                // Submit project form
+                const submitProjectButton = document.getElementById('submit-project-btn');
+                if (submitProjectButton) {
+                    submitProjectButton.addEventListener('click', handleAddProject);
+                }
+
+                // Cancel project form
+                const cancelProjectButton = document.getElementById('cancel-project-btn');
+                if (cancelProjectButton) {
+                    cancelProjectButton.addEventListener('click', () => closeModal(addProjectModal));
+                }
+
+                // Submit issue form
+                const submitIssueButton = document.getElementById('submit-issue-btn');
+                if (submitIssueButton) {
+                    submitIssueButton.addEventListener('click', handleAddIssue);
+                }
+
+                // Cancel issue form
+                const cancelIssueButton = document.getElementById('cancel-issue-btn');
+                if (cancelIssueButton) {
+                    cancelIssueButton.addEventListener('click', () => closeModal(addIssueModal));
+                }
+
+                // Schedule filters
+                const scheduleDateFilter = document.getElementById('schedule-date-filter');
+                const scheduleQAFilter = document.getElementById('schedule-qa-filter');
+                if (scheduleDateFilter) {
+                    scheduleDateFilter.addEventListener('change', renderWorkSchedule);
+                }
+                if (scheduleQAFilter) {
+                    scheduleQAFilter.addEventListener('change', renderWorkSchedule);
+                }
+
+                // Editable fields
+                document.addEventListener('change', handleFieldUpdate);
+                document.addEventListener('blur', handleFieldUpdate, true);
+            } catch (e) {
+                showToast('Error setting up event listeners: ' + e.message, 'error');
+                console.error('Setup event listeners error:', e);
+            }
+        }
+
+        // --- Load html2canvas with Retry ---
+        async function loadHtml2Canvas() {
+            const maxRetries = 3;
+            let attempts = 0;
+            while (attempts < maxRetries) {
+                try {
+                    if (!window.html2canvas) {
+                        const script = document.createElement('script');
+                        script.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js';
+                        script.async = true;
+                        document.head.appendChild(script);
+                        await new Promise((resolve, reject) => {
+                            script.onload = resolve;
+                            script.onerror = () => reject(new Error('Failed to load html2canvas'));
+                        });
+                    }
+                    return;
+                } catch (e) {
+                    attempts++;
+                    if (attempts === maxRetries) {
+                        console.error('Failed to load html2canvas after retries:', e);
+                        showToast('html2canvas not loaded; screenshot functionality unavailable', 'error');
+                    }
+                }
+            }
+        }
+
+        // --- Initialize Dashboard ---
+        async function init() {
+            try {
+                await loadHtml2Canvas();
+                setupEventListeners();
+                await populateModalDropdowns();
+                await renderAllTabs();
+            } catch (e) {
+                showToast('Error initializing dashboard: ' + e.message, 'error');
+                console.error('Initialization error:', e);
+            }
+        }
+
+        // Start initialization
+        init();
+    });
+    </script>
+</body>
+</html>
