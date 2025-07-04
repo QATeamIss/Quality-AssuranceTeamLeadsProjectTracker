@@ -1,223 +1,3 @@
-
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Project Management Dashboard</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <style>
-        body {
-            font-family: 'Inter', sans-serif;
-            background-color: #f0f2f5;
-        }
-        [contenteditable="true"] {
-            outline: 2px dashed #4a90e2;
-            background-color: #f0f9ff;
-            padding: 2px 4px;
-            border-radius: 4px;
-        }
-        .pyramid {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-        }
-        .pyramid-level {
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            color: white;
-            font-weight: bold;
-            text-shadow: 1px 1px 2px rgba(0,0,0,0.5);
-            transition: all 0.3s ease;
-        }
-        .pyramid-level:hover {
-            transform: scale(1.05);
-        }
-        #toast-container {
-            position: fixed;
-            bottom: 20px;
-            right: 20px;
-            z-index: 1000;
-            display: flex;
-            flex-direction: column;
-            gap: 10px;
-        }
-        .toast {
-            padding: 12px 20px;
-            border-radius: 8px;
-            color: white;
-            font-weight: 500;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-            opacity: 0;
-            transform: translateY(20px);
-            animation: toast-in 0.5s forwards;
-        }
-        .toast.success { background-color: #28a745; }
-        .toast.error { background-color: #dc3545; }
-        @keyframes toast-in {
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
-        }
-        @keyframes pulse {
-            50% { opacity: .6; }
-        }
-        .status-in-progress-pulse {
-            animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
-        }
-        table {
-            border-collapse: collapse;
-        }
-        th, td {
-            border: 2px solid #d1d5db;
-            padding: 12px;
-        }
-        thead {
-            background-color: #f9fafb;
-            border-bottom: 2px solid #d1d5db;
-        }
-        button, a.tab-link {
-            cursor: pointer;
-        }
-        button:disabled {
-            cursor: not-allowed;
-            opacity: 0.5;
-        }
-    </style>
-</head>
-<body class="text-gray-800">
-    <div class="container mx-auto p-4 md:p-6 lg:p-8">
-        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6">
-            <div>
-                <h1 class="text-3xl font-bold text-gray-800">Project Management Dashboard</h1>
-                <p class="text-gray-500 mt-1">Central hub for tracking projects, schedules, and issues.</p>
-            </div>
-            <div class="flex items-center space-x-2 mt-4 sm:mt-0">
-                <button id="toggle-edit-mode" class="bg-blue-600 text-white px-4 py-2 rounded-lg shadow hover:bg-blue-700 transition duration-300 flex items-center gap-2">
-                    <i class="fas fa-edit"></i>
-                    <span id="edit-mode-text">Toggle Edit Mode</span>
-                </button>
-                <button id="save-btn" class="bg-green-500 text-white px-4 py-2 rounded-lg shadow hover:bg-green-600 transition duration-300 flex items-center gap-2" disabled>
-                    <i class="fas fa-save"></i>
-                    <span>Save Changes</span>
-                </button>
-            </div>
-        </div>
-
-        <div class="mb-6">
-            <div class="border-b border-gray-200">
-                <nav class="-mb-px flex space-x-6 overflow-x-auto" aria-label="Tabs">
-                    <a href="#" class="tab-link active whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm border-blue-600 text-blue-600" data-tab="tracker">
-                        <i class="fas fa-tasks mr-2"></i>Tracker
-                    </a>
-                    <a href="#" class="tab-link text-gray-500 hover:text-gray-700 hover:border-gray-300 whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm" data-tab="schedule">
-                        <i class="fas fa-calendar-alt mr-2"></i>Work Schedule
-                    </a>
-                    <a href="#" class="tab-link text-gray-500 hover:text-gray-700 hover:border-gray-300 whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm" data-tab="coordinator">
-                        <i class="fas fa-exclamation-circle mr-2"></i>Project Coordinator
-                    </a>
-                    <a href="#" class="tab-link text-gray-500 hover:text-gray-700 hover:border-gray-300 whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm" data-tab="summary">
-                        <i class="fas fa-chart-pie mr-2"></i>Summary
-                    </a>
-                </nav>
-            </div>
-        </div>
-
-        <div id="tab-content">
-            <div id="tracker" class="tab-pane active">
-                <div class="flex justify-between items-center mb-4">
-                    <h2 class="text-2xl font-semibold">Project Tracker</h2>
-                    <div class="flex gap-2">
-                        <button id="add-project-btn" class="bg-indigo-600 text-white px-4 py-2 rounded-lg shadow hover:bg-indigo-700 transition duration-300 flex items-center gap-2">
-                            <i class="fas fa-plus"></i> Add Project
-                        </button>
-                        <button id="copy-tracker-report" class="bg-blue-500 text-white px-4 py-2 rounded-lg shadow hover:bg-blue-600 transition duration-300 flex items-center gap-2">
-                            <i class="fas fa-copy"></i> Copy Report
-                        </button>
-                    </div>
-                </div>
-                <div class="bg-white p-6 rounded-xl shadow-lg overflow-x-auto">
-                    <table class="w-full text-sm text-left text-gray-500">
-                        <thead class="text-xs text-gray-700 uppercase bg-gray-50">
-                            <tr>
-                                <th class="px-6 py-3">Project Name</th>
-                                <th class="px-6 py-3">Sub Phase</th>
-                                <th class="px-6 py-3">Assigned To</th>
-                                <th class="px-6 py-3">Status</th>
-                                <th class="px-6 py-3">Start Date</th>
-                                <th class="px-6 py-3">End Date</th>
-                                <th class="px-6 py-3">Actual Comp. Date</th>
-                                <th class="px-6 py-3">Comments</th>
-                                <th class="px-6 py-3">Bug Count</th>
-                                <th class="px-6 py-3">Deviated?</th>
-                                <th class="px-6 py-3">Deviation Reason</th>
-                            </tr>
-                        </thead>
-                        <tbody id="project-tracker-body">
-                            <tr><td colspan="11" class="text-center py-4">Loading...</td></tr>
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-
-            <div id="schedule" class="tab-pane hidden">
-                <div class="flex justify-between items-center mb-4">
-                    <h2 class="text-2xl font-semibold">Work Schedule</h2>
-                    <div class="flex gap-4">
-                        <select id="schedule-date-filter" class="border px-2 py-1 rounded">
-                            <option value="">All Dates</option>
-                        </select>
-                        <select id="schedule-qa-filter" class="border px-2 py-1 rounded">
-                            <option value="">All QA</option>
-                        </select>
-                        <button id="copy-schedule-report" class="bg-blue-500 text-white px-4 py-2 rounded-lg shadow hover:bg-blue-600 transition duration-300 flex items-center gap-2">
-                            <i class="fas fa-copy"></i> Copy Report
-                        </button>
-                    </div>
-                </div>
-                <div id="work-schedule-content" class="bg-white p-6 rounded-xl shadow-lg">
-                    <p class="text-center py-4">Loading...</p>
-                </div>
-            </div>
-
-            <div id="coordinator" class="tab-pane hidden">
-                <div class="flex justify-between items-center mb-4">
-                    <h2 class="text-2xl font-semibold">Issues Log</h2>
-                    <button id="add-issue-btn" class="bg-red-600 text-white px-4 py-2 rounded-lg shadow hover:bg-red-700 transition duration-300 flex items-center gap-2">
-                        <i class="fas fa-plus"></i> Add Issue
-                    </button>
-                </div>
-                <div id="issues-log-content" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    <p class="text-center py-4">Loading...</p>
-                </div>
-            </div>
-
-            <div id="summary" class="tab-pane hidden space-y-8">
-                <div>
-                    <h2 class="text-2xl font-semibold mb-4">At a Glance</h2>
-                    <div id="summary-metrics" class="grid grid-cols-2 md:grid-cols-4 gap-4">
-                        <p class="text-center py-4">Loading...</p>
-                    </div>
-                </div>
-                <div class="grid grid-cols-1 lg:grid-cols-3 gap-8sony
-
-System: The provided HTML and JavaScript code for the Project Management Dashboard is well-structured but has issues with data not displaying in the table and links not working. Below is the fixed version of the code with improvements to ensure data rendering and link functionality. The key issues identified and addressed are:
-
-1. **Data Not Displaying**: Likely due to Supabase configuration issues, missing data, or rendering errors. Added robust error handling, ensured proper data fetching, and provided fallback UI states.
-2. **Links Not Working**: Fixed tab navigation by ensuring event listeners are correctly set up and preventing default link behavior.
-3. **General Improvements**: Enhanced error handling, optimized asynchronous operations, and ensured all UI elements update correctly.
-
-### Revised Code
-
-```html
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -547,19 +327,22 @@ System: The provided HTML and JavaScript code for the Project Management Dashboa
         document.addEventListener('DOMContentLoaded', async () => {
             // --- Initialize Supabase Client ---
             let supabase;
+            const currentTime = new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' }); // 04:11 PM IST, July 04, 2025
+            console.log(`[${currentTime}] Starting dashboard initialization`);
+
             try {
                 supabase = window.supabase.createClient(
                     'https://xwrdvdjzmoeeakriqdit.supabase.co',
-                    'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inh3cmR2ZGp6bW9lZWFrcmlxZGl0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTA4MzQ3NTYsImV4cCI6MjA2NjQxMDc1Nn0.3vVZtjg70gKz4eKqDybHoV1yWYIWbxJe36ObszVMit0'
+                    'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inh3cmR2ZGp6bW9lZWFrcmlxZGl0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTA4MzQ3NTYsImV4cCI6MjA2NjY0MTA3NTZ9.3vVZtjg70gKz4eKqDybHoV1yWYIWbxJe36ObszVMit0'
                 );
-                const { data, error } = await supabase.from('projects').select('id').limit(1);
-                if (error) throw new Error('Supabase connection test failed: ' + error.message);
+                const { data, error } = await Promise.race([
+                    supabase.from('projects').select('id').limit(1),
+                    new Promise((_, reject) => setTimeout(() => reject(new Error('Supabase connection timed out')), 5000))
+                ]);
+                if (error) throw error;
             } catch (e) {
-                showToast('Failed to initialize Supabase: ' + e.message, 'error');
-                console.error('Supabase initialization error:', e);
-                document.querySelectorAll('.tab-pane').forEach(pane => {
-                    pane.innerHTML = '<p class="text-center py-4 text-red-600">Failed to connect to database</p>';
-                });
+                console.error(`[${currentTime}] Supabase initialization error:`, e);
+                showLoadingError('Failed to connect to database at ' + currentTime + '. Check Supabase URL/key or network.');
                 return;
             }
 
@@ -582,6 +365,16 @@ System: The provided HTML and JavaScript code for the Project Management Dashboa
                 }, 3000);
             }
 
+            function showLoadingError(message) {
+                document.querySelectorAll('.tab-pane').forEach(pane => {
+                    const loadingElement = pane.querySelector('tbody') || pane.querySelector('div');
+                    if (loadingElement) {
+                        loadingElement.innerHTML = `<p class="text-center py-4 text-red-600">${message}</p>`;
+                    }
+                });
+                showToast(message, 'error');
+            }
+
             // --- Status Color Mapping ---
             function getStatusColor(status) {
                 const colors = {
@@ -598,17 +391,23 @@ System: The provided HTML and JavaScript code for the Project Management Dashboa
 
             // --- Fetch Data from Supabase ---
             async function fetchProjects() {
+                const startTime = new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' });
+                console.log(`[${startTime}] Fetching projects...`);
                 try {
-                    const { data, error } = await supabase
-                        .from('projects')
-                        .select(`
-                            id, project, start_date, end_date, actual_comp_date, comments, bug_count, deviated, deviation_reason,
-                            sub_phases(name),
-                            statuses(name)
-                        `);
+                    const { data, error } = await Promise.race([
+                        supabase
+                            .from('projects')
+                            .select(`
+                                id, project, start_date, end_date, actual_comp_date, comments, bug_count, deviated, deviation_reason,
+                                sub_phases(name),
+                                statuses(name)
+                            `)
+                            .limit(100),
+                        new Promise((_, reject) => setTimeout(() => reject(new Error('Fetch timed out')), 10000))
+                    ]);
                     if (error) throw error;
                     if (!data || data.length === 0) {
-                        showToast('No projects found in database', 'error');
+                        console.warn(`[${startTime}] No projects found`);
                         return [];
                     }
 
@@ -618,30 +417,30 @@ System: The provided HTML and JavaScript code for the Project Management Dashboa
                             .select('users(name)')
                             .eq('project_id', p.id);
                         if (assigneeError) {
-                            console.error('Assignee fetch error:', assigneeError);
+                            console.error(`[${startTime}] Assignee fetch error for project ${p.id}:`, assigneeError);
                             return { ...p, assignedTo: [], assignedToArray: [] };
                         }
                         return {
                             id: p.id,
-                            project: p.project,
-                            subPhase: p.sub_phases?.name || '',
-                            assignedTo: assignees.map(a => a.users?.name || '').filter(Boolean).join(', '),
-                            assignedToArray: assignees.map(a => a.users?.name || '').filter(Boolean),
-                            status: p.statuses?.name || '',
-                            startDate: p.start_date,
-                            endDate: p.end_date,
-                            actualCompDate: p.actual_comp_date,
+                            project: p.project || 'Unnamed',
+                            subPhase: p.sub_phases?.name || 'N/A',
+                            assignedTo: assignees.map(a => a.users?.name || 'Unknown').join(', ') || 'N/A',
+                            assignedToArray: assignees.map(a => a.users?.name || 'Unknown').filter(Boolean),
+                            status: p.statuses?.name || 'Yet to Start',
+                            startDate: p.start_date || '',
+                            endDate: p.end_date || '',
+                            actualCompDate: p.actual_comp_date || '',
                             comments: p.comments || '',
                             bugCount: p.bug_count || 0,
                             deviated: p.deviated ? 'Yes' : 'No',
                             deviationReason: p.deviation_reason || ''
-MMP
                         };
                     }));
+                    console.log(`[${new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}] Fetched ${projectsWithAssignees.length} projects`);
                     return projectsWithAssignees;
                 } catch (e) {
-                    showToast('Error fetching projects: ' + e.message, 'error');
-                    console.error('Fetch projects error:', e);
+                    console.error(`[${startTime}] Fetch projects error:`, e);
+                    showLoadingError(`Error fetching projects at ${startTime}. Check console.`);
                     return [];
                 }
             }
@@ -662,7 +461,7 @@ MMP
                         status: s.statuses?.name || 'Yet to Start'
                     }));
                 } catch (e) {
-                    showToast('Error fetching schedule statuses: ' + e.message, 'error');
+                    showLoadingError('Error fetching schedule statuses: ' + e.message);
                     console.error('Fetch schedule statuses error:', e);
                     return [];
                 }
@@ -692,7 +491,7 @@ MMP
                         actualCompDate: q.actual_comp_date
                     }));
                 } catch (e) {
-                    showToast('Error fetching QA summary: ' + e.message, 'error');
+                    showLoadingError('Error fetching QA summary: ' + e.message);
                     console.error('Fetch QA summary error:', e);
                     return [];
                 }
@@ -721,7 +520,7 @@ MMP
                         bugCount: p.bug_count
                     }));
                 } catch (e) {
-                    showToast('Error fetching performance metrics: ' + e.message, 'error');
+                    showLoadingError('Error fetching performance metrics: ' + e.message);
                     console.error('Fetch performance metrics error:', e);
                     return [];
                 }
@@ -743,7 +542,7 @@ MMP
                         issue: i.issue
                     }));
                 } catch (e) {
-                    showToast('Error fetching issues log: ' + e.message, 'error');
+                    showLoadingError('Error fetching issues log: ' + e.message);
                     console.error('Fetch issues log error:', e);
                     return [];
                 }
@@ -755,7 +554,7 @@ MMP
                     if (error) throw error;
                     return data.map(u => ({ id: u.id, name: u.name }));
                 } catch (e) {
-                    showToast('Error fetching users: ' + e.message, 'error');
+                    showLoadingError('Error fetching users: ' + e.message);
                     console.error('Fetch users error:', e);
                     return [];
                 }
@@ -767,7 +566,7 @@ MMP
                     if (error) throw error;
                     return data.map(s => s.name);
                 } catch (e) {
-                    showToast('Error fetching statuses: ' + e.message, 'error');
+                    showLoadingError('Error fetching statuses: ' + e.message);
                     console.error('Fetch statuses error:', e);
                     return [];
                 }
@@ -779,7 +578,7 @@ MMP
                     if (error) throw error;
                     return data.map(sp => sp.name);
                 } catch (e) {
-                    showToast('Error fetching sub phases: ' + e.message, 'error');
+                    showLoadingError('Error fetching sub phases: ' + e.message);
                     console.error('Fetch sub phases error:', e);
                     return [];
                 }
@@ -789,17 +588,26 @@ MMP
             async function renderProjectTracker() {
                 const tbody = document.getElementById('project-tracker-body');
                 if (!tbody) {
-                    showToast('Project tracker table not found', 'error');
+                    console.error(`[${currentTime}] Project tracker body not found`);
+                    showLoadingError('Dashboard element not found at ' + currentTime);
                     return;
                 }
                 tbody.innerHTML = '<tr><td colspan="11" class="text-center py-4">Loading...</td></tr>';
+
+                const loadingTimeout = setTimeout(() => {
+                    showLoadingError('Loading timed out at ' + new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' }) + '. Check network or database.');
+                }, 10000); // 10-second timeout
+
                 try {
                     const projects = (await fetchProjects()).filter(p => !['Completed', 'Rejected'].includes(p.status));
+                    clearTimeout(loadingTimeout);
+
                     tbody.innerHTML = '';
                     if (projects.length === 0) {
-                        tbody.innerHTML = '<tr><td colspan="11" class="text-center py-4">No active projects found</td></tr>';
+                        tbody.innerHTML = '<tr><td colspan="11" class="text-center py-4">No active projects found at ' + currentTime + '</td></tr>';
                         return;
                     }
+
                     projects.sort((a, b) => new Date(a.startDate) - new Date(b.startDate)).forEach(proj => {
                         const row = document.createElement('tr');
                         row.className = 'bg-white';
@@ -825,9 +633,9 @@ MMP
                         select.addEventListener('change', handleDeviatedChange);
                     });
                 } catch (e) {
-                    tbody.innerHTML = '<tr><td colspan="11" class="text-center py-4 text-red-600">Error loading projects</td></tr>';
-                    showToast('Error rendering project tracker: ' + e.message, 'error');
-                    console.error('Render project tracker error:', e);
+                    clearTimeout(loadingTimeout);
+                    console.error(`[${currentTime}] Render project tracker error:`, e);
+                    showLoadingError('Error rendering projects at ' + currentTime + '. See console.');
                 }
                 applyEditMode();
             }
@@ -843,16 +651,22 @@ MMP
             async function renderWorkSchedule() {
                 const container = document.getElementById('work-schedule-content');
                 if (!container) {
-                    showToast('Work schedule container not found', 'error');
+                    showLoadingError('Work schedule container not found');
                     return;
                 }
                 container.innerHTML = '<p class="text-center py-4">Loading...</p>';
+
+                const loadingTimeout = setTimeout(() => {
+                    showLoadingError('Loading timed out. Check network or database.');
+                }, 10000);
+
                 try {
                     const filterDate = document.getElementById('schedule-date-filter').value;
                     const filterQA = document.getElementById('schedule-qa-filter').value;
                     const [projects, scheduleStatuses] = await Promise.all([fetchProjects(), fetchScheduleStatuses()]);
-                    const scheduleItems = [];
+                    clearTimeout(loadingTimeout);
 
+                    const scheduleItems = [];
                     projects.forEach(proj => {
                         if (!proj.startDate || !proj.endDate) return;
                         let currentDate = new Date(proj.startDate);
@@ -944,13 +758,12 @@ MMP
                         if (date === currentDate) option.selected = true;
                         dateSelect.appendChild(option);
                     });
-
-                    applyEditMode();
                 } catch (e) {
-                    container.innerHTML = '<p class="text-center py-4 text-red-600">Error loading schedule</p>';
-                    showToast('Error rendering work schedule: ' + e.message, 'error');
-                    console.error('Render work schedule error:', e);
+                    clearTimeout(loadingTimeout);
+                    console.error(`[${currentTime}] Render work schedule error:`, e);
+                    showLoadingError('Error rendering work schedule at ' + currentTime + '. See console.');
                 }
+                applyEditMode();
             }
 
             async function copyTrackerReport() {
@@ -1029,12 +842,19 @@ MMP
             async function renderIssuesLog() {
                 const container = document.getElementById('issues-log-content');
                 if (!container) {
-                    showToast('Issues log container not found', 'error');
+                    showLoadingError('Issues log container not found');
                     return;
                 }
                 container.innerHTML = '<p class="text-center py-4">Loading...</p>';
+
+                const loadingTimeout = setTimeout(() => {
+                    showLoadingError('Loading timed out. Check network or database.');
+                }, 10000);
+
                 try {
                     const issues = await fetchIssuesLog();
+                    clearTimeout(loadingTimeout);
+
                     container.innerHTML = '';
                     if (issues.length === 0) {
                         container.innerHTML = '<p class="text-center py-4">No issues found</p>';
@@ -1051,20 +871,20 @@ MMP
                         container.appendChild(card);
                     });
                 } catch (e) {
-                    container.innerHTML = '<p class="text-center py-4 text-red-600">Error loading issues</p>';
-                    showToast('Error rendering issues log: ' + e.message, 'error');
-                    console.error('Render issues log error:', e);
+                    clearTimeout(loadingTimeout);
+                    console.error(`[${currentTime}] Render issues log error:`, e);
+                    showLoadingError('Error rendering issues log at ' + currentTime + '. See console.');
                 }
                 applyEditMode();
             }
 
             async function renderSummary() {
-                const metricsContainer = document.getElementById('summary-metrics');
+                const metricsContainer = document.getElementById('summary-metric');
                 const qaBody = document.getElementById('qa-summary-body');
                 const perfBody = document.getElementById('performance-metrics-body');
                 const funnelContainer = document.getElementById('project-funnel');
                 if (!metricsContainer || !qaBody || !perfBody || !funnelContainer) {
-                    showToast('Summary containers not found', 'error');
+                    showLoadingError('Summary containers not found');
                     return;
                 }
 
@@ -1073,6 +893,10 @@ MMP
                 perfBody.innerHTML = '<tr><td colspan="8" class="text-center py-4">Loading...</td></tr>';
                 funnelContainer.innerHTML = '<p class="text-center py-4">Loading...</p>';
 
+                const loadingTimeout = setTimeout(() => {
+                    showLoadingError('Loading timed out. Check network or database.');
+                }, 10000);
+
                 try {
                     const [projects, issues, qaSummary, performanceMetrics] = await Promise.all([
                         fetchProjects(),
@@ -1080,6 +904,7 @@ MMP
                         fetchQASummary(),
                         fetchPerformanceMetrics()
                     ]);
+                    clearTimeout(loadingTimeout);
 
                     metricsContainer.innerHTML = `
                         <div class="bg-white p-4 rounded-xl shadow-lg flex items-center"><i class="fas fa-layer-group fa-2x text-blue-500 mr-4"></i><div><p class="text-2xl font-bold">${projects.length}</p><p class="text-gray-500">Total Projects</p></div></div>
@@ -1147,12 +972,9 @@ MMP
                         </div>
                     `).join('');
                 } catch (e) {
-                    metricsContainer.innerHTML = '<p class="text-center py-4 text-red-600">Error loading metrics</p>';
-                    qaBody.innerHTML = '<tr><td colspan="8" class="text-center py-4 text-red-600">Error loading QA summary</td></tr>';
-                    perfBody.innerHTML = '<tr><td colspan="8" class="text-center py-4 text-red-600">Error loading performance metrics</td></tr>';
-                    funnelContainer.innerHTML = '<p class="text-center py-4 text-red-600">Error loading funnel</p>';
-                    showToast('Error rendering summary: ' + e.message, 'error');
-                    console.error('Render summary error:', e);
+                    clearTimeout(loadingTimeout);
+                    console.error(`[${currentTime}] Render summary error:`, e);
+                    showLoadingError('Error rendering summary at ' + currentTime + '. See console.');
                 }
                 applyEditMode();
             }
@@ -1241,7 +1063,7 @@ MMP
                     if (field === 'deviated') return ['Yes', 'No'];
                     return [];
                 } catch (e) {
-                    showToast('Error fetching options: ' + e.message, 'error');
+                    showLoadingError('Error fetching options: ' + e.message);
                     console.error('Get options error:', e);
                     return [];
                 }
@@ -1279,7 +1101,8 @@ MMP
                         if (id) {
                             ({ error } = await supabase.from('schedule_status').update({ status_id: status?.id }).eq('id', id));
                         } else {
-                            ({ error } = await supabase.from('schedule_status').insert(updateData));
+                            ({ data, error } = await supabase.from('schedule_status').insert(updateData).select('id').single());
+                            if (data) updateData.id = data.id;
                         }
 
                         if (error) throw error;
@@ -1338,300 +1161,301 @@ MMP
 
                         showToast(`${field} updated successfully!`);
                         renderAllTabs();
-                    } catch (e) {
-                        showToast(`Error updating ${field}: ${e.message}`, 'error');
-                        console.error('Handle field update error:', e);
                     }
+                } catch (e) {
+                    showToast(`Error updating ${field}: ${e.message}`, 'error');
+                    console.error('Handle field update error:', e);
+                }
+            }
+
+            async function updateQASummary(project) {
+                try {
+                    const projects = await fetchProjects();
+                    const proj = projects.find(p => p.id === project.id);
+                    if (proj.status !== 'Completed') return;
+
+                    const { data: existing } = await supabase
+                        .from('qa_summary')
+                        .select('id')
+                        .eq('project_id', project.id);
+                    if (existing.length > 0) return;
+
+                    const { data: subPhase } = await supabase.from('sub_phases').select('id').eq('name', proj.subPhase).single();
+                    const users = await fetchUsers();
+                    const assignedToIds = proj.assignedToArray.map(name => users.find(u => u.name === name)?.id).filter(Boolean);
+                    const { data: status } = await supabase.from('statuses').select('id').eq('name', 'Completed').single();
+
+                    const { error } = await supabase.from('qa_summary').insert({
+                        project_id: project.id,
+                        sub_phase_id: subPhase?.id,
+                        pc: users[0]?.name || 'Unknown',
+                        assigned_to_id: assignedToIds[0] || null,
+                        status_id: status?.id,
+                        start_date: proj.startDate,
+                        end_date: proj.endDate,
+                        actual_comp_date: proj.actualCompDate
+                    });
+                    if (error) throw error;
+                } catch (e) {
+                    showToast('Error updating QA summary: ' + e.message, 'error');
+                    console.error('Update QA summary error:', e);
+                }
+            }
+
+            // --- Modal Handling ---
+            const addProjectModal = document.getElementById('add-project-modal');
+            const addIssueModal = document.getElementById('add-issue-modal');
+
+            function openModal(modal) {
+                if (modal) {
+                    modal.classList.remove('hidden');
+                    populateModalDropdowns();
+                }
+            }
+
+            function closeModal(modal) {
+                if (modal) {
+                    modal.classList.add('hidden');
+                    modal.querySelector('form')?.reset();
+                }
+            }
+
+            async function populateModalDropdowns() {
+                try {
+                    const [subPhases, users, statuses, projects] = await Promise.all([
+                        fetchSubPhases(),
+                        fetchUsers(),
+                        fetchStatuses(),
+                        fetchProjects()
+                    ]);
+
+                    const subPhaseSelect = document.getElementById('new-project-subphase');
+                    const assignedToSelect = document.getElementById('new-project-assignedTo');
+                    const statusSelect = document.getElementById('new-project-status');
+                    const projectSelect = document.getElementById('new-issue-project-name');
+
+                    if (subPhaseSelect) {
+                        subPhaseSelect.innerHTML = '<option value="" disabled selected>Sub Phase</option>';
+                        subPhases.forEach(sp => {
+                            const option = document.createElement('option');
+                            option.value = sp;
+                            option.textContent = sp;
+                            subPhaseSelect.appendChild(option);
+                        });
+                    }
+
+                    if (assignedToSelect) {
+                        assignedToSelect.innerHTML = '';
+                        users.forEach(user => {
+                            const option = document.createElement('option');
+                            option.value = user.name;
+                            option.textContent = user.name;
+                            assignedToSelect.appendChild(option);
+                        });
+                    }
+
+                    if (statusSelect) {
+                        statusSelect.innerHTML = '<option value="" disabled selected>Status</option>';
+                        statuses.forEach(status => {
+                            const option = document.createElement('option');
+                            option.value = status;
+                            option.textContent = status;
+                            statusSelect.appendChild(option);
+                        });
+                    }
+
+                    if (projectSelect) {
+                        projectSelect.innerHTML = '<option value="" disabled selected>Project</option>';
+                        [...new Set(projects.map(p => p.project))].sort().forEach(project => {
+                            const option = document.createElement('option');
+                            option.value = project;
+                            option.textContent = project;
+                            projectSelect.appendChild(option);
+                        });
+                    }
+                } catch (e) {
+                    console.error(`[${currentTime}] Populate dropdowns error:`, e);
+                    showLoadingError('Error populating dropdowns at ' + currentTime + '. See console.');
+                }
+            }
+
+            // --- Form Submission Handlers ---
+            async function handleAddProject(e) {
+                e.preventDefault();
+                const form = document.getElementById('add-project-form');
+                const projectName = document.getElementById('new-project-name').value;
+                const subPhase = document.getElementById('new-project-subphase').value;
+                const assignedTo = Array.from(document.getElementById('new-project-assignedTo').selectedOptions).map(opt => opt.value);
+                const status = document.getElementById('new-project-status').value;
+                const startDate = document.getElementById('new-project-startDate').value;
+                const endDate = document.getElementById('new-project-endDate').value;
+
+                if (!projectName || !subPhase || !status) {
+                    showToast('Please fill all required fields', 'error');
+                    return;
                 }
 
-                async function updateQASummary(project) {
-                    try {
-                        const projects = await fetchProjects();
-                        const proj = projects.find(p => p.id === project.id);
-                        if (proj.status !== 'Completed') return;
+                try {
+                    const { data: subPhaseData } = await supabase.from('sub_phases').select('id').eq('name', subPhase).single();
+                    const { data: statusData } = await supabase.from('statuses').select('id').eq('name', status).single();
+                    const { data: projectData, error: projectError } = await supabase
+                        .from('projects')
+                        .insert({
+                            project: projectName,
+                            sub_phase_id: subPhaseData?.id,
+                            status_id: statusData?.id,
+                            start_date: startDate || null,
+                            end_date: endDate || null,
+                            comments: '',
+                            bug_count: 0,
+                            deviated: false,
+                            deviation_reason: ''
+                        })
+                        .select('id')
+                        .single();
 
-                        const { data: existing } = await supabase
-                            .from('qa_summary')
-                            .select('id')
-                            .eq('project_id', project.id);
-                        if (existing.length > 0) return;
+                    if (projectError) throw projectError;
 
-                        const { data: subPhase } = await supabase.from('sub_phases').select('id').eq('name', proj.subPhase).single();
+                    if (assignedTo.length > 0) {
                         const users = await fetchUsers();
-                        const assignedToIds = proj.assignedToArray.map(name => users.find(u => u.name === name)?.id).filter(Boolean);
-                        const { data: status } = await supabase.from('statuses').select('id').eq('name', 'Completed').single();
-
-                        const { error } = await supabase.from('qa_summary').insert({
-                            project_id: project.id,
-                            sub_phase_id: subPhase?.id,
-                            pc: users[0]?.name || 'Unknown',
-                            assigned_to_id: assignedToIds[0] || null,
-                            status_id: status?.id,
-                            start_date: proj.startDate,
-                            end_date: proj.endDate,
-                            actual_comp_date: proj.actualCompDate
-                        });
-                        if (error) throw error;
-                    } catch (e) {
-                        showToast('Error updating QA summary: ' + e.message, 'error');
-                        console.error('Update QA summary error:', e);
+                        const assigneeInserts = assignedTo.map(name => {
+                            const user = users.find(u => u.name === name);
+                            return { project_id: projectData.id, user_id: user?.id };
+                        }).filter(Boolean);
+                        const { error: assigneeError } = await supabase.from('project_assignees').insert(assigneeInserts);
+                        if (assigneeError) throw assigneeError;
                     }
+
+                    showToast('Project added successfully!');
+                    closeModal(addProjectModal);
+                    renderProjectTracker();
+                } catch (e) {
+                    console.error(`[${currentTime}] Add project error:`, e);
+                    showToast('Error adding project: ' + e.message, 'error');
+                }
+            }
+
+            async function handleAddIssue(e) {
+                e.preventDefault();
+                const form = document.getElementById('add-issue-form');
+                const projectName = document.getElementById('new-issue-project-name').value;
+                const pc = document.getElementById('new-issue-pc').value;
+                const description = document.getElementById('new-issue-description').value;
+
+                if (!projectName || !pc || !description) {
+                    showToast('Please fill all required fields', 'error');
+                    return;
                 }
 
-                // --- Modal Handling ---
-                const addProjectModal = document.getElementById('add-project-modal');
-                const addIssueModal = document.getElementById('add-issue-modal');
-
-                function openModal(modal) {
-                    if (modal) {
-                        modal.classList.remove('hidden');
-                        populateModalDropdowns();
-                    }
-                }
-
-                function closeModal(modal) {
-                    if (modal) {
-                        modal.classList.add('hidden');
-                        modal.querySelector('form')?.reset();
-                    }
-                }
-
-                async function populateModalDropdowns() {
-                    try {
-                        const [subPhases, users, statuses, projects] = await Promise.all([
-                            fetchSubPhases(),
-                            fetchUsers(),
-                            fetchStatuses(),
-                            fetchProjects()
-                        ]);
-
-                        const subPhaseSelect = document.getElementById('new-project-subphase');
-                        const assignedToSelect = document.getElementById('new-project-assignedTo');
-                        const statusSelect = document.getElementById('new-project-status');
-                        const projectSelect = document.getElementById('new-issue-project-name');
-
-                        if (subPhaseSelect) {
-                            subPhaseSelect.innerHTML = '<option value="" disabled selected>Sub Phase</option>';
-                            subPhases.forEach(sp => {
-                                const option = document.createElement('option');
-                                option.value = sp;
-                                option.textContent = sp;
-                                subPhaseSelect.appendChild(option);
-                            });
-                        }
-
-                        if (assignedToSelect) {
-                            assignedToSelect.innerHTML = '';
-                            users.forEach(user => {
-                                const option = document.createElement('option');
-                                option.value = user.name;
-                                option.textContent = user.name;
-                                assignedToSelect.appendChild(option);
-                            });
-                        }
-
-                        if (statusSelect) {
-                            statusSelect.innerHTML = '<option value="" disabled selected>Status</option>';
-                            statuses.forEach(status => {
-                                const option = document.createElement('option');
-                                option.value = status;
-                                option.textContent = status;
-                                statusSelect.appendChild(option);
-                            });
-                        }
-
-                        if (projectSelect) {
-                            projectSelect.innerHTML = '<option value="" disabled selected>Project</option>';
-                            [...new Set(projects.map(p => p.project))].sort().forEach(project => {
-                                const option = document.createElement('option');
-                                option.value = project;
-                                option.textContent = project;
-                                projectSelect.appendChild(option);
-                            });
-                        }
-                    } catch (e) {
-                        showToast('Error populating dropdowns: ' + e.message, 'error');
-                        console.error('Populate dropdowns error:', e);
-                    }
-                }
-
-                // --- Form Submission Handlers ---
-                async function handleAddProject(e) {
-                    e.preventDefault();
-                    const form = document.getElementById('add-project-form');
-                    const projectName = document.getElementById('new-project-name').value;
-                    const subPhase = document.getElementById('new-project-subphase').value;
-                    const assignedTo = Array.from(document.getElementById('new-project-assignedTo').selectedOptions).map(opt => opt.value);
-                    const status = document.getElementById('new-project-status').value;
-                    const startDate = document.getElementById('new-project-startDate').value;
-                    const endDate = document.getElementById('new-project-endDate').value;
-
-                    if (!projectName || !subPhase || !status) {
-                        showToast('Please fill all required fields', 'error');
-                        return;
-                    }
-
-                    try {
-                        const { data: subPhaseData } = await supabase.from('sub_phases').select('id').eq('name', subPhase).single();
-                        const { data: statusData } = await supabase.from('statuses').select('id').eq('name', status).single();
-                        const { data: projectData, error: projectError } = await supabase
-                            .from('projects')
-                            .insert({
-                                project: projectName,
-                                sub_phase_id: subPhaseData?.id,
-                                status_id: statusData?.id,
-                                start_date: startDate || null,
-                                end_date: endDate || null,
-                                comments: '',
-                                bug_count: 0,
-                                deviated: false,
-                                deviation_reason: ''
-                            })
-                            .select('id')
-                            .single();
-
-                        if (projectError) throw projectError;
-
-                        if (assignedTo.length > 0) {
-                            const users = await fetchUsers();
-                            const assigneeInserts = assignedTo.map(name => {
-                                const user = users.find(u => u.name === name);
-                                return { project_id: projectData.id, user_id: user?.id };
-                            }).filter(Boolean);
-                            const { error: assigneeError } = await supabase.from('project_assignees').insert(assigneeInserts);
-                            if (assigneeError) throw assigneeError;
-                        }
-
-                        showToast('Project added successfully!');
-                        closeModal(addProjectModal);
-                        renderProjectTracker();
-                    } catch (e) {
-                        showToast('Error adding project: ' + e.message, 'error');
-                        console.error('Add project error:', e);
-                    }
-                }
-
-                async function handleAddIssue(e) {
-                    e.preventDefault();
-                    const form = document.getElementById('add-issue-form');
-                    const projectName = document.getElementById('new-issue-project-name').value;
-                    const pc = document.getElementById('new-issue-pc').value;
-                    const description = document.getElementById('new-issue-description').value;
-
-                    if (!projectName || !pc || !description) {
-                        showToast('Please fill all required fields', 'error');
-                        return;
-                    }
-
-                    try {
-                        const { data: project } = await supabase.from('projects').select('id').eq('project', projectName).single();
-                        const { error } = await supabase.from('issues_log').insert({
-                            project_id: project?.id,
-                            pc,
-                            issue: description
-                        });
-
-                        if (error) throw error;
-                        showToast('Issue added successfully!');
-                        closeModal(addIssueModal);
-                        renderIssuesLog();
-                    } catch (e) {
-                        showToast('Error adding issue: ' + e.message, 'error');
-                        console.error('Add issue error:', e);
-                    }
-                }
-
-                // --- Tab Navigation ---
-                function switchTab(tabId) {
-                    const tabLinks = document.querySelectorAll('.tab-link');
-                    const tabPanes = document.querySelectorAll('.tab-pane');
-
-                    tabLinks.forEach(link => {
-                        link.classList.remove('active', 'border-blue-600', 'text-blue-600');
-                        link.classList.add('text-gray-500', 'hover:text-gray-700', 'hover:border-gray-300');
-                        if (link.dataset.tab === tabId) {
-                            link.classList.add('active', 'border-blue-600', 'text-blue-600');
-                            link.classList.remove('text-gray-500', 'hover:text-gray-700', 'hover:border-gray-300');
-                        }
+                try {
+                    const { data: project } = await supabase.from('projects').select('id').eq('project', projectName).single();
+                    const { error } = await supabase.from('issues_log').insert({
+                        project_id: project?.id,
+                        pc,
+                        issue: description
                     });
 
-                    tabPanes.forEach(pane => {
-                        pane.classList.add('hidden');
-                        if (pane.id === tabId) {
-                            pane.classList.remove('hidden');
-                        }
-                    });
-
-                    // Render the content for the selected tab
-                    if (tabId === 'tracker') renderProjectTracker();
-                    else if (tabId === 'schedule') renderWorkSchedule();
-                    else if (tabId === 'coordinator') renderIssuesLog();
-                    else if (tabId === 'summary') renderSummary();
+                    if (error) throw error;
+                    showToast('Issue added successfully!');
+                    closeModal(addIssueModal);
+                    renderIssuesLog();
+                } catch (e) {
+                    console.error(`[${currentTime}] Add issue error:`, e);
+                    showToast('Error adding issue: ' + e.message, 'error');
                 }
+            }
 
-                // --- Render All Tabs ---
-                async function renderAllTabs() {
-                    const activeTab = document.querySelector('.tab-link.active')?.dataset.tab;
-                    if (activeTab === 'tracker') await renderProjectTracker();
-                    else if (activeTab === 'schedule') await renderWorkSchedule();
-                    else if (activeTab === 'coordinator') await renderIssuesLog();
-                    else if (activeTab === 'summary') await renderSummary();
-                }
+            // --- Tab Navigation ---
+            function switchTab(tabId) {
+                const tabLinks = document.querySelectorAll('.tab-link');
+                const tabPanes = document.querySelectorAll('.tab-pane');
 
-                // --- Event Listeners ---
-                document.getElementById('toggle-edit-mode')?.addEventListener('click', () => {
-                    isEditMode = !isEditMode;
-                    document.getElementById('edit-mode-text').textContent = isEditMode ? 'Exit Edit Mode' : 'Toggle Edit Mode';
-                    document.getElementById('save-btn').disabled = !isEditMode;
-                    applyEditMode();
-                });
-
-                document.getElementById('save-btn')?.addEventListener('click', async () => {
-                    isEditMode = false;
-                    document.getElementById('edit-mode-text').textContent = 'Toggle Edit Mode';
-                    document.getElementById('save-btn').disabled = true;
-                    applyEditMode();
-                    showToast('Changes saved!');
-                });
-
-                document.getElementById('add-project-btn')?.addEventListener('click', () => openModal(addProjectModal));
-                document.getElementById('cancel-project-btn')?.addEventListener('click', () => closeModal(addProjectModal));
-                document.getElementById('submit-project-btn')?.addEventListener('click', handleAddProject);
-
-                document.getElementById('add-issue-btn')?.addEventListener('click', () => openModal(addIssueModal));
-                document.getElementById('cancel-issue-btn')?.addEventListener('click', () => closeModal(addIssueModal));
-                document.getElementById('submit-issue-btn')?.addEventListener('click', handleAddIssue);
-
-                document.getElementById('copy-tracker-report')?.addEventListener('click', copyTrackerReport);
-                document.getElementById('copy-schedule-report')?.addEventListener('click', copyScheduleReport);
-
-                document.getElementById('schedule-date-filter')?.addEventListener('change', renderWorkSchedule);
-                document.getElementById('schedule-qa-filter')?.addEventListener('change', renderWorkSchedule);
-
-                document.querySelectorAll('.tab-link').forEach(link => {
-                    link.addEventListener('click', (e) => {
-                        e.preventDefault();
-                        const tabId = link.dataset.tab;
-                        switchTab(tabId);
-                    });
-                });
-
-                document.addEventListener('change', async (e) => {
-                    if (isEditMode && (e.target.tagName === 'SELECT' || (e.target.tagName === 'INPUT' && (e.target.type === 'date' || e.target.type === 'number')))) {
-                        await handleFieldUpdate(e);
+                tabLinks.forEach(link => {
+                    link.classList.remove('active', 'border-blue-600', 'text-blue-600');
+                    link.classList.add('text-gray-500', 'hover:text-gray-700', 'hover:border-gray-300');
+                    if (link.dataset.tab === tabId) {
+                        link.classList.add('active', 'border-blue-600', 'text-blue-600');
+                        link.classList.remove('text-gray-500', 'hover:text-gray-700', 'hover:border-gray-300');
                     }
                 });
 
-                document.addEventListener('blur', async (e) => {
-                    if (isEditMode && e.target.isContentEditable) {
-                        await handleFieldUpdate(e);
+                tabPanes.forEach(pane => {
+                    pane.classList.add('hidden');
+                    if (pane.id === tabId) {
+                        pane.classList.remove('hidden');
                     }
-                }, true);
+                });
 
-                // --- Initial Render ---
-                await renderProjectTracker();
-                await populateModalDropdowns();
+                // Render the content for the selected tab
+                if (tabId === 'tracker') renderProjectTracker();
+                else if (tabId === 'schedule') renderWorkSchedule();
+                else if (tabId === 'coordinator') renderIssuesLog();
+                else if (tabId === 'summary') renderSummary();
+            }
+
+            // --- Render All Tabs ---
+            async function renderAllTabs() {
+                const activeTab = document.querySelector('.tab-link.active')?.dataset.tab;
+                if (activeTab === 'tracker') await renderProjectTracker();
+                else if (activeTab === 'schedule') await renderWorkSchedule();
+                else if (activeTab === 'coordinator') await renderIssuesLog();
+                else if (activeTab === 'summary') await renderSummary();
+            }
+
+            // --- Event Listeners ---
+            document.getElementById('toggle-edit-mode')?.addEventListener('click', () => {
+                isEditMode = !isEditMode;
+                document.getElementById('edit-mode-text').textContent = isEditMode ? 'Exit Edit Mode' : 'Toggle Edit Mode';
+                document.getElementById('save-btn').disabled = !isEditMode;
+                applyEditMode();
             });
+
+            document.getElementById('save-btn')?.addEventListener('click', async () => {
+                isEditMode = false;
+                document.getElementById('edit-mode-text').textContent = 'Toggle Edit Mode';
+                document.getElementById('save-btn').disabled = true;
+                applyEditMode();
+                showToast('Changes saved!');
+            });
+
+            document.getElementById('add-project-btn')?.addEventListener('click', () => openModal(addProjectModal));
+            document.getElementById('cancel-project-btn')?.addEventListener('click', () => closeModal(addProjectModal));
+            document.getElementById('submit-project-btn')?.addEventListener('click', handleAddProject);
+
+            document.getElementById('add-issue-btn')?.addEventListener('click', () => openModal(addIssueModal));
+            document.getElementById('cancel-issue-btn')?.addEventListener('click', () => closeModal(addIssueModal));
+            document.getElementById('submit-issue-btn')?.addEventListener('click', handleAddIssue);
+
+            document.getElementById('copy-tracker-report')?.addEventListener('click', copyTrackerReport);
+            document.getElementById('copy-schedule-report')?.addEventListener('click', copyScheduleReport);
+
+            document.getElementById('schedule-date-filter')?.addEventListener('change', renderWorkSchedule);
+            document.getElementById('schedule-qa-filter')?.addEventListener('change', renderWorkSchedule);
+
+            document.querySelectorAll('.tab-link').forEach(link => {
+                link.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    const tabId = link.dataset.tab;
+                    switchTab(tabId);
+                });
+            });
+
+            document.addEventListener('change', async (e) => {
+                if (isEditMode && (e.target.tagName === 'SELECT' || (e.target.tagName === 'INPUT' && (e.target.type === 'date' || e.target.type === 'number')))) {
+                    await handleFieldUpdate(e);
+                }
+            });
+
+            document.addEventListener('blur', async (e) => {
+                if (isEditMode && e.target.isContentEditable) {
+                    await handleFieldUpdate(e);
+                }
+            }, true);
+
+            // --- Initial Render
+            switchTab('tracker'); // Default to Tracker tab
+            console.log(`[${new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}] Dashboard initialized successfully`);
+        });
     </script>
 </body>
 </html>
