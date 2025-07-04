@@ -1,25 +1,4 @@
-The error "Error updating undefined: undefined is not an object (evaluating 'field.toLowerCase')" indicates that the `field` variable in the `handleFieldUpdate` function is undefined when an attempt is made to call `toLowerCase()` on it. This likely occurs when an editable element lacks the `data-field` attribute, which happens if the DOM element's dataset is incomplete or improperly initialized, especially during edit mode updates. The issue arises in this block of code:
 
-```javascript
-else if (field === 'subPhase') {
-    // ... rest of the code
-} else {
-    updateData[field.toLowerCase()] = value || null;
-}
-```
-
-### Cause
-- The `editable` element might not have a `data-field` attribute set, possibly due to a mismatch in how elements are created or updated in `applyEditMode` or during dynamic rendering.
-- This could happen if a new element is added without proper dataset initialization or if an event is triggered on an element outside the expected structure.
-
-### Fix
-1. **Add a Check for `field`**: Ensure `field` is defined before processing it.
-2. **Improve Element Validation**: Verify that all editable elements have the required `data-field` attribute during initialization and updates.
-3. **Log Debugging Information**: Add logging to track the problematic element for better diagnostics.
-
-Here’s the corrected `handleFieldUpdate` function within the full HTML:
-
-```html
 <!DOCTYPE html>
 <html lang="en">
 <head>
