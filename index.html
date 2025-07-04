@@ -1,3 +1,4 @@
+```html
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -258,7 +259,7 @@
                         </div>
                     </form>
                 </div>
-                <div class="items-center px вооружение-4 py-3">
+                <div class="items-center px-4 py-3">
                     <button id="submit-project-btn" class="px-4 py-2 bg-blue-500 text-white text-base font-medium rounded-md w-full shadow-sm hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-300">
                         Add Project
                     </button>
@@ -299,19 +300,31 @@
     <script>
     document.addEventListener('DOMContentLoaded', async () => {
         // --- Initialize Supabase Client ---
-        const supabase = window.supabase.createClient(
-            'https://xwrdvdjzmoeeakriqdit.supabase.co',
-            'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inh3cmR2ZGp6bW9lZWFrcmlxZGl0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTA4MzQ3NTYsImV4cCI6MjA2NjQxMDc1Nn0.3vVZtjg70gKz4eKqDybHoV1yWYIWbxJe36ObszVMit0'
-        );
+        let supabase;
+        try {
+            if (!window.supabase) {
+                throw new Error('Supabase library not loaded');
+            }
+            supabase = window.supabase.createClient(
+                'https://xwrdvdjzmoeeakriqdit.supabase.co',
+                'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inh3cmR2ZGp6bW9lZWFrcmlxZGl0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTA4MzQ3NTYsImV4cCI6MjA2NjQxMDc1Nn0.3vVZtjg70gKz4eKqDybHoV1yWYIWbxJe36ObszVMit0'
+            );
+        } catch (e) {
+            showToast('Failed to initialize Supabase: ' + e.message, 'error');
+            console.error('Supabase initialization error:', e);
+            return;
+        }
 
         let isEditMode = false;
 
         // --- Toast Notification ---
         function showToast(message, type = 'success') {
+            const toastContainer = document.getElementById('toast-container');
+            if (!toastContainer) return;
             const toast = document.createElement('div');
             toast.className = `toast ${type}`;
             toast.innerHTML = `<i class="fas ${type === 'success' ? 'fa-check-circle' : 'fa-times-circle'}"></i> ${message}`;
-            document.getElementById('toast-container').appendChild(toast);
+            toastContainer.appendChild(toast);
             setTimeout(() => {
                 toast.style.opacity = '0';
                 setTimeout(() => toast.remove(), 500);
@@ -334,175 +347,195 @@
 
         // --- Fetch Data from Supabase ---
         async function fetchProjects() {
-            const { data, error } = await supabase
-                .from('projects')
-                .select(`
-                    id, project, start_date, end_date, actual_comp_date, comments, bug_count, deviated, deviation_reason,
-                    sub_phases(name),
-                    statuses(name)
-                `);
-            if (error) {
-                showToast('Error fetching projects: ' + error.message, 'error');
-                console.error(error);
+            try {
+                const { data, error } = await supabase
+                    .from('projects')
+                    .select(`
+                        id, project, start_date, end_date, actual_comp_date, comments, bug_count, deviated, deviation_reason,
+                        sub_phases(name),
+                        statuses(name)
+                    `);
+                if (error) throw error;
+
+                const projectsWithAssignees = await Promise.all(data.map(async (p) => {
+                    const { data: assignees, error: assigneeError } = await supabase
+                        .from('project_assignees')
+                        .select('users(name)')
+                        .eq('project_id', p.id);
+                    if (assigneeError) {
+                        console.error('Assignee fetch error:', assigneeError);
+                        return { ...p, assignedTo: [], assignedToArray: [] };
+                    }
+                    return {
+                        id: p.id,
+                        project: p.project,
+                        subPhase: p.sub_phases?.name || '',
+                        assignedTo: assignees.map(a => a.users?.name || '').filter(Boolean).join(', '),
+                        assignedToArray: assignees.map(a => a.users?.name || '').filter(Boolean),
+                        status: p.statuses?.name || '',
+                        startDate: p.start_date,
+                        endDate: p.end_date,
+                        actualCompDate: p.actual_comp_date,
+                        comments: p.comments || '',
+                        bugCount: p.bug_count || 0,
+                        deviated: p.deviated ? 'Yes' : 'No',
+                        deviationReason: p.deviation_reason || ''
+                    };
+                }));
+                return projectsWithAssignees;
+            } catch (e) {
+                showToast('Error fetching projects: ' + e.message, 'error');
+                console.error('Fetch projects error:', e);
                 return [];
             }
-            // Fetch assignees for each project
-            const projectsWithAssignees = await Promise.all(data.map(async (p) => {
-                const { data: assignees, error: assigneeError } = await supabase
-                    .from('project_assignees')
-                    .select('users(name)')
-                    .eq('project_id', p.id);
-                if (assigneeError) {
-                    console.error(assigneeError);
-                    return { ...p, assignedTo: [] };
-                }
-                return {
-                    id: p.id,
-                    project: p.project,
-                    subPhase: p.sub_phases?.name || '',
-                    assignedTo: assignees.map(a => a.users?.name || '').filter(Boolean).join(', '),
-                    assignedToArray: assignees.map(a => a.users?.name || '').filter(Boolean),
-                    status: p.statuses?.name || '',
-                    startDate: p.start_date,
-                    endDate: p.end_date,
-                    actualCompDate: p.actual_comp_date,
-                    comments: p.comments || '',
-                    bugCount: p.bug_count || 0,
-                    deviated: p.deviated ? 'Yes' : 'No',
-                    deviationReason: p.deviation_reason || ''
-                };
-            }));
-            return projectsWithAssignees;
         }
 
         async function fetchScheduleStatuses() {
-            const { data, error } = await supabase
-                .from('schedule_status')
-                .select(`
-                    id, date, project_id,
-                    statuses(name)
-                `);
-            if (error) {
-                showToast('Error fetching schedule statuses: ' + error.message, 'error');
-                console.error(error);
+            try {
+                const { data, error } = await supabase
+                    .from('schedule_status')
+                    .select(`
+                        id, date, project_id,
+                        statuses(name)
+                    `);
+                if (error) throw error;
+                return data.map(s => ({
+                    id: s.id,
+                    projectId: s.project_id,
+                    date: s.date,
+                    status: s.statuses?.name || 'Yet to Start'
+                }));
+            } catch (e) {
+                showToast('Error fetching schedule statuses: ' + e.message, 'error');
+                console.error('Fetch schedule statuses error:', e);
                 return [];
             }
-            return data.map(s => ({
-                id: s.id,
-                projectId: s.project_id,
-                date: s.date,
-                status: s.statuses?.name || 'Yet to Start'
-            }));
         }
 
         async function fetchQASummary() {
-            const { data, error } = await supabase
-                .from('qa_summary')
-                .select(`
-                    id, pc, start_date, end_date, actual_comp_date,
-                    projects(project),
-                    sub_phases(name),
-                    users!assigned_to_id(name),
-                    statuses(name)
-                `);
-            if (error) {
-                showToast('Error fetching QA summary: ' + error.message, 'error');
-                console.error(error);
+            try {
+                const { data, error } = await supabase
+                    .from('qa_summary')
+                    .select(`
+                        id, pc, start_date, end_date, actual_comp_date,
+                        projects(project),
+                        sub_phases(name),
+                        users!assigned_to_id(name),
+                        statuses(name)
+                    `);
+                if (error) throw error;
+                return data.map(q => ({
+                    id: q.id,
+                    projectName: q.projects?.project || '',
+                    subPhase: q.sub_phases?.name || '',
+                    pc: q.pc,
+                    assignedTo: q.users?.name || '',
+                    status: q.statuses?.name || '',
+                    startDate: q.start_date,
+                    endDate: q.end_date,
+                    actualCompDate: q.actual_comp_date
+                }));
+            } catch (e) {
+                showToast('Error fetching QA summary: ' + e.message, 'error');
+                console.error('Fetch QA summary error:', e);
                 return [];
             }
-            return data.map(q => ({
-                id: q.id,
-                projectName: q.projects?.project || '',
-                subPhase: q.sub_phases?.name || '',
-                pc: q.pc,
-                assignedTo: q.users?.name || '',
-                status: q.statuses?.name || '',
-                startDate: q.start_date,
-                endDate: q.end_date,
-                actualCompDate: q.actual_comp_date
-            }));
         }
 
         async function fetchPerformanceMetrics() {
-            const { data, error } = await supabase
-                .from('performance_metrics')
-                .select(`
-                    id, time_taken, deviation, sprint, bug_count, start_date,
-                    projects(project),
-                    users!resource_id(name),
-                    sub_phases(name)
-                `);
-            if (error) {
-                showToast('Error fetching performance metrics: ' + error.message, 'error');
-                console.error(error);
+            try {
+                const { data, error } = await supabase
+                    .from('performance_metrics')
+                    .select(`
+                        id, time_taken, deviation, sprint, bug_count, start_date,
+                        projects(project),
+                        users!resource_id(name),
+                        sub_phases(name)
+                    `);
+                if (error) throw error;
+                return data.map(p => ({
+                    id: p.id,
+                    project: p.projects?.project || '',
+                    resource: p.users?.name || '',
+                    phase: p.sub_phases?.name || '',
+                    startDate: p.start_date,
+                    timeTaken: p.time_taken,
+                    deviation: p.deviation,
+                    sprint: p.sprint,
+                    bugCount: p.bug_count
+                }));
+            } catch (e) {
+                showToast('Error fetching performance metrics: ' + e.message, 'error');
+                console.error('Fetch performance metrics error:', e);
                 return [];
             }
-            return data.map(p => ({
-                id: p.id,
-                project: p.projects?.project || '',
-                resource: p.users?.name || '',
-                phase: p.sub_phases?.name || '',
-                startDate: p.start_date,
-                timeTaken: p.time_taken,
-                deviation: p.deviation,
-                sprint: p.sprint,
-                bugCount: p.bug_count
-            }));
         }
 
         async function fetchIssuesLog() {
-            const { data, error } = await supabase
-                .from('issues_log')
-                .select(`
-                    id, pc, issue,
-                    projects(project)
-                `);
-            if (error) {
-                showToast('Error fetching issues log: ' + error.message, 'error');
-                console.error(error);
+            try {
+                const { data, error } = await supabase
+                    .from('issues_log')
+                    .select(`
+                        id, pc, issue,
+                        projects(project)
+                    `);
+                if (error) throw error;
+                return data.map(i => ({
+                    id: i.id,
+                    projectName: i.projects?.project || '',
+                    pc: i.pc,
+                    issue: i.issue
+                }));
+            } catch (e) {
+                showToast('Error fetching issues log: ' + e.message, 'error');
+                console.error('Fetch issues log error:', e);
                 return [];
             }
-            return data.map(i => ({
-                id: i.id,
-                projectName: i.projects?.project || '',
-                pc: i.pc,
-                issue: i.issue
-            }));
         }
 
         async function fetchUsers() {
-            const { data, error } = await supabase.from('users').select('id, name').order('name');
-            if (error) {
-                showToast('Error fetching users: ' + error.message, 'error');
-                console.error(error);
+            try {
+                const { data, error } = await supabase.from('users').select('id, name').order('name');
+                if (error) throw error;
+                return data.map(u => ({ id: u.id, name: u.name }));
+            } catch (e) {
+                showToast('Error fetching users: ' + e.message, 'error');
+                console.error('Fetch users error:', e);
                 return [];
             }
-            return data.map(u => ({ id: u.id, name: u.name }));
         }
 
         async function fetchStatuses() {
-            const { data, error } = await supabase.from('statuses').select('name').order('name');
-            if (error) {
-                showToast('Error fetching statuses: ' + error.message, 'error');
-                console.error(error);
+            try {
+                const { data, error } = await supabase.from('statuses').select('name').order('name');
+                if (error) throw error;
+                return data.map(s => s.name);
+            } catch (e) {
+                showToast('Error fetching statuses: ' + e.message, 'error');
+                console.error('Fetch statuses error:', e);
                 return [];
             }
-            return data.map(s => s.name);
         }
 
         async function fetchSubPhases() {
-            const { data, error } = await supabase.from('sub_phases').select('name').order('name');
-            if (error) {
-                showToast('Error fetching sub phases: ' + error.message, 'error');
-                console.error(error);
+            try {
+                const { data, error } = await supabase.from('sub_phases').select('name').order('name');
+                if (error) throw error;
+                return data.map(sp => sp.name);
+            } catch (e) {
+                showToast('Error fetching sub phases: ' + e.message, 'error');
+                console.error('Fetch sub phases error:', e);
                 return [];
             }
-            return data.map(sp => sp.name);
         }
 
         // --- Render Functions ---
         async function renderProjectTracker() {
             const tbody = document.getElementById('project-tracker-body');
+            if (!tbody) {
+                showToast('Project tracker table not found', 'error');
+                return;
+            }
             tbody.innerHTML = '<tr><td colspan="11" class="text-center py-4">Loading...</td></tr>';
             try {
                 const projects = (await fetchProjects()).filter(p => !['Completed', 'Rejected'].includes(p.status));
@@ -527,23 +560,32 @@
                     `;
                     tbody.appendChild(row);
                 });
-                // Add event listeners for deviated field to toggle deviation reason
                 document.querySelectorAll('[data-field="deviated"]').forEach(select => {
-                    select.addEventListener('change', (e) => {
-                        const row = e.target.closest('tr');
-                        const reasonCell = row.querySelector('[data-field="deviationReason"]');
-                        reasonCell.classList.toggle('hidden', e.target.value !== 'Yes');
-                    });
+                    select.removeEventListener('change', handleDeviatedChange);
+                    select.addEventListener('change', handleDeviatedChange);
                 });
             } catch (e) {
                 tbody.innerHTML = '<tr><td colspan="11" class="text-center py-4 text-red-600">Error loading projects</td></tr>';
-                console.error(e);
+                showToast('Error rendering project tracker: ' + e.message, 'error');
+                console.error('Render project tracker error:', e);
             }
             applyEditMode();
         }
 
+        function handleDeviatedChange(e) {
+            const row = e.target.closest('tr');
+            const reasonCell = row.querySelector('[data-field="deviationReason"]');
+            if (reasonCell) {
+                reasonCell.classList.toggle('hidden', e.target.value !== 'Yes');
+            }
+        }
+
         async function renderWorkSchedule() {
             const container = document.getElementById('work-schedule-content');
+            if (!container) {
+                showToast('Work schedule container not found', 'error');
+                return;
+            }
             container.innerHTML = '<p class="text-center py-4">Loading...</p>';
             try {
                 const filterDate = document.getElementById('schedule-date-filter').value;
@@ -642,37 +684,50 @@
                 applyEditMode();
             } catch (e) {
                 container.innerHTML = '<p class="text-center py-4 text-red-600">Error loading schedule</p>';
-                console.error(e);
+                showToast('Error rendering work schedule: ' + e.message, 'error');
+                console.error('Render work schedule error:', e);
             }
         }
 
         async function copyTrackerReport() {
             const tbody = document.getElementById('project-tracker-body');
+            if (!tbody) {
+                showToast('Project tracker table not found', 'error');
+                return;
+            }
             let text = 'Project Tracker Report:\n';
             Array.from(tbody.querySelectorAll('tr')).forEach(row => {
                 const cells = row.querySelectorAll('td');
                 text += `Project: ${cells[0].textContent}, Sub Phase: ${cells[1].textContent}, Assigned To: ${cells[2].textContent}, Status: ${cells[3].textContent}, Start: ${cells[4].textContent}, End: ${cells[5].textContent}, Actual Comp.: ${cells[6].textContent}, Comments: ${cells[7].textContent}, Bug Count: ${cells[8].textContent}, Deviated: ${cells[9].textContent}, Deviation Reason: ${cells[10].textContent}\n`;
             });
             try {
-                const table = tbody.closest('table');
-                const canvas = await html2canvas(table);
-                canvas.toBlob(blob => {
-                    const item = new ClipboardItem({ "image/png": blob });
-                    navigator.clipboard.write([item]);
-                });
+                if (window.html2canvas) {
+                    const table = tbody.closest('table');
+                    const canvas = await window.html2canvas(table);
+                    canvas.toBlob(blob => {
+                        const item = new ClipboardItem({ "image/png": blob });
+                        navigator.clipboard.write([item]).catch(e => showToast('Failed to copy screenshot: ' + e.message, 'error'));
+                    });
+                } else {
+                    showToast('html2canvas not available, text copied', 'error');
+                }
+                await navigator.clipboard.writeText(text);
+                showToast('Tracker report copied (text and screenshot)!');
             } catch (e) {
-                console.error('Screenshot failed:', e);
-                showToast('Failed to copy screenshot, text copied', 'error');
+                showToast('Failed to copy report: ' + e.message, 'error');
+                console.error('Copy tracker report error:', e);
             }
-            await navigator.clipboard.writeText(text);
-            showToast('Tracker report copied (text and screenshot)!');
         }
 
         async function copyScheduleReport() {
-            const filterDate = document.getElementById('schedule-date-filter').value;
             const container = document.getElementById('work-schedule-content');
+            if (!container) {
+                showToast('Work schedule container not found', 'error');
+                return;
+            }
+            const filterDate = document.getElementById('schedule-date-filter').value;
             let text = filterDate ? `Work Schedule for ${filterDate}:\n` : 'Work Schedule:\n';
-            let elementsToCapture = filterDate 
+            let elementsToCapture = filterDate
                 ? Array.from(container.querySelectorAll('div.mb-6')).filter(div => div.querySelector('h3').textContent === filterDate)
                 : Array.from(container.querySelectorAll('div.mb-6'));
 
@@ -684,27 +739,35 @@
             });
 
             try {
-                const captureDiv = document.createElement('div');
-                captureDiv.style.position = 'absolute';
-                captureDiv.style.left = '-9999px';
-                captureDiv.append(...elementsToCapture.map(el => el.cloneNode(true)));
-                document.body.appendChild(captureDiv);
-                const canvas = await html2canvas(captureDiv);
-                canvas.toBlob(blob => {
-                    const item = new ClipboardItem({ "image/png": blob });
-                    navigator.clipboard.write([item]);
-                });
-                captureDiv.remove();
+                if (window.html2canvas) {
+                    const captureDiv = document.createElement('div');
+                    captureDiv.style.position = 'absolute';
+                    captureDiv.style.left = '-9999px';
+                    captureDiv.append(...elementsToCapture.map(el => el.cloneNode(true)));
+                    document.body.appendChild(captureDiv);
+                    const canvas = await window.html2canvas(captureDiv);
+                    canvas.toBlob(blob => {
+                        const item = new ClipboardItem({ "image/png": blob });
+                        navigator.clipboard.write([item]).catch(e => showToast('Failed to copy screenshot: ' + e.message, 'error'));
+                    });
+                    captureDiv.remove();
+                } else {
+                    showToast('html2canvas not available, text copied', 'error');
+                }
+                await navigator.clipboard.writeText(text);
+                showToast('Schedule report copied (text and screenshot)!');
             } catch (e) {
-                console.error('Screenshot failed:', e);
-                showToast('Failed to copy screenshot, text copied', 'error');
+                showToast('Failed to copy schedule report: ' + e.message, 'error');
+                console.error('Copy schedule report error:', e);
             }
-            await navigator.clipboard.writeText(text);
-            showToast('Schedule report copied (text and screenshot)!');
         }
 
         async function renderIssuesLog() {
             const container = document.getElementById('issues-log-content');
+            if (!container) {
+                showToast('Issues log container not found', 'error');
+                return;
+            }
             container.innerHTML = '<p class="text-center py-4">Loading...</p>';
             try {
                 const issues = await fetchIssuesLog();
@@ -721,7 +784,8 @@
                 });
             } catch (e) {
                 container.innerHTML = '<p class="text-center py-4 text-red-600">Error loading issues</p>';
-                console.error(e);
+                showToast('Error rendering issues log: ' + e.message, 'error');
+                console.error('Render issues log error:', e);
             }
             applyEditMode();
         }
@@ -731,6 +795,10 @@
             const qaBody = document.getElementById('qa-summary-body');
             const perfBody = document.getElementById('performance-metrics-body');
             const funnelContainer = document.getElementById('project-funnel');
+            if (!metricsContainer || !qaBody || !perfBody || !funnelContainer) {
+                showToast('Summary containers not found', 'error');
+                return;
+            }
 
             metricsContainer.innerHTML = '<p class="text-center py-4">Loading...</p>';
             qaBody.innerHTML = '<tr><td colspan="8" class="text-center py-4">Loading...</td></tr>';
@@ -773,7 +841,7 @@
                 performanceMetrics.forEach(item => {
                     const row = document.createElement('tr');
                     row.className = 'bg-white';
-                    const deviationClass = item.deviation.includes('>') || parseFloat(item.deviation) > 0 ? 'bg-red-200 text-red-900 font-bold' : '';
+                    const deviationClass = item.deviation && (item.deviation.includes('>') || parseFloat(item.deviation) > 0) ? 'bg-red-200 text-red-900 font-bold' : '';
                     row.innerHTML = `
                         <td class="px-4 py-4 editable" data-table="performance_metrics" data-id="${item.id}" data-field="project" data-type="select">${item.project}</td>
                         <td class="px-4 py-4 editable" data-table="performance_metrics" data-id="${item.id}" data-field="resource" data-type="select">${item.resource}</td>
@@ -807,7 +875,8 @@
                 qaBody.innerHTML = '<tr><td colspan="8" class="text-center py-4 text-red-600">Error loading QA summary</td></tr>';
                 perfBody.innerHTML = '<tr><td colspan="8" class="text-center py-4 text-red-600">Error loading performance metrics</td></tr>';
                 funnelContainer.innerHTML = '<p class="text-center py-4 text-red-600">Error loading funnel</p>';
-                console.error(e);
+                showToast('Error rendering summary: ' + e.message, 'error');
+                console.error('Render summary error:', e);
             }
             applyEditMode();
         }
@@ -815,6 +884,7 @@
         // --- Edit Mode Functions ---
         function applyEditMode() {
             document.querySelectorAll('.editable').forEach(el => {
+                if (!el) return;
                 if (!isEditMode) {
                     if (el.tagName === 'SELECT' || (el.tagName === 'SPAN' && el.querySelector('input'))) {
                         const span = document.createElement('span');
@@ -844,7 +914,7 @@
                             const select = document.createElement('select');
                             select.multiple = true;
                             select.className = `${el.className} p-1 border rounded w-full`;
-                            for conjuntos de datos (const key in el.dataset) select.dataset[key] = el.dataset[key];
+                            for (const key in el.dataset) select.dataset[key] = el.dataset[key];
                             getOptionsForField(el.dataset.table, el.dataset.field).then(options => {
                                 options.forEach(opt => {
                                     const option = document.createElement('option');
@@ -884,15 +954,21 @@
         }
 
         async function getOptionsForField(table, field) {
-            if (field === 'assignedTo' || field === 'resource') return await fetchUsers();
-            if (field === 'status') return await fetchStatuses();
-            if (field === 'subPhase' || field === 'phase') return await fetchSubPhases();
-            if (field === 'project' || field === 'projectName') {
-                const projects = await fetchProjects();
-                return [...new Set(projects.map(p => p.project))].sort();
+            try {
+                if (field === 'assignedTo' || field === 'resource') return await fetchUsers();
+                if (field === 'status') return await fetchStatuses();
+                if (field === 'subPhase' || field === 'phase') return await fetchSubPhases();
+                if (field === 'project' || field === 'projectName') {
+                    const projects = await fetchProjects();
+                    return [...new Set(projects.map(p => p.project))].sort();
+                }
+                if (field === 'deviated') return ['Yes', 'No'];
+                return [];
+            } catch (e) {
+                showToast('Error fetching options: ' + e.message, 'error');
+                console.error('Get options error:', e);
+                return [];
             }
-            if (field === 'deviated') return ['Yes', 'No'];
-            return [];
         }
 
         async function handleFieldUpdate(e) {
@@ -930,10 +1006,7 @@
                         ({ error } = await supabase.from('schedule_status').insert(updateData));
                     }
 
-                    if (error) {
-                        showToast(`Error updating schedule status: ${error.message}`, 'error');
-                        return;
-                    }
+                    if (error) throw error;
                     showToast('Schedule status updated successfully!');
                     renderWorkSchedule();
                 } else {
@@ -942,9 +1015,7 @@
                         const { data: subPhase } = await supabase.from('sub_phases').select('id').eq('name', value).single();
                         updateData['sub_phase_id'] = subPhase?.id;
                     } else if (field === 'assignedTo') {
-                        // Delete existing assignees
                         await supabase.from('project_assignees').delete().eq('project_id', id);
-                        // Insert new assignees
                         if (value.length > 0) {
                             const users = await fetchUsers();
                             const assigneeInserts = value.map(name => {
@@ -952,10 +1023,7 @@
                                 return { project_id: id, user_id: user?.id };
                             }).filter(Boolean);
                             const { error: assigneeError } = await supabase.from('project_assignees').insert(assigneeInserts);
-                            if (assigneeError) {
-                                showToast(`Error updating assignees: ${assigneeError.message}`, 'error');
-                                return;
-                            }
+                            if (assigneeError) throw assigneeError;
                         }
                     } else if (field === 'status') {
                         const { data: status } = await supabase.from('statuses').select('id').eq('name', value).single();
@@ -973,10 +1041,7 @@
 
                     if (Object.keys(updateData).length > 0) {
                         const { error } = await supabase.from(table).update(updateData).eq('id', id);
-                        if (error) {
-                            showToast(`Error updating ${field}: ${error.message}`, 'error');
-                            return;
-                        }
+                        if (error) throw error;
                     }
 
                     if (table === 'projects' && field === 'status' && value === 'Completed') {
@@ -984,26 +1049,23 @@
                             .from('projects')
                             .update({ actual_comp_date: new Date().toISOString().split('T')[0] })
                             .eq('id', id);
-                        if (compError) {
-                            showToast(`Error setting completion date: ${compError.message}`, 'error');
-                        } else {
-                            await updateQASummary({ id, project: (await fetchProjects()).find(p => p.id === id) });
-                        }
+                        if (compError) throw compError;
+                        await updateQASummary({ id, project: (await fetchProjects()).find(p => p.id === id) });
                     }
                     if (table === 'qa_summary' && field === 'status' && value === 'Completed') {
                         const { error: compError } = await supabase
                             .from('qa_summary')
                             .update({ actual_comp_date: new Date().toISOString().split('T')[0] })
                             .eq('id', id);
-                        if (compError) showToast(`Error setting completion date: ${compError.message}`, 'error');
+                        if (compError) throw compError;
                     }
 
                     showToast(`${field} updated successfully!`);
                     renderAllTabs();
                 }
             } catch (e) {
-                showToast(`Error updating ${field}`, 'error');
-                console.error(e);
+                showToast(`Error updating ${field}: ${e.message}`, 'error');
+                console.error('Handle field update error:', e);
             }
         }
 
@@ -1027,17 +1089,17 @@
                 const { error } = await supabase.from('qa_summary').insert({
                     project_id: project.id,
                     sub_phase_id: subPhase?.id,
-                    pc: (await fetchUsers())[0]?.name || 'Unknown',
-                    assigned_to_id: assignedToIds[0] || null, // Use first assignee for QA summary
+                    pc: users[0]?.name || 'Unknown',
+                    assigned_to_id: assignedToIds[0] || null,
                     status_id: status?.id,
                     start_date: proj.startDate,
                     end_date: proj.endDate,
                     actual_comp_date: proj.actualCompDate
                 });
-                if (error) showToast(`Error adding QA summary: ${error.message}`, 'error');
+                if (error) throw error;
             } catch (e) {
-                console.error(e);
-                showToast('Error updating QA summary', 'error');
+                showToast('Error updating QA summary: ' + e.message, 'error');
+                console.error('Update QA summary error:', e);
             }
         }
 
@@ -1045,21 +1107,25 @@
         const addProjectModal = document.getElementById('add-project-modal');
         const addIssueModal = document.getElementById('add-issue-modal');
         function openModal(modal) {
-            modal.classList.remove('hidden');
-            populateModalDropdowns();
+            if (modal) {
+                modal.classList.remove('hidden');
+                populateModalDropdowns();
+            }
         }
         function closeModal(modal) {
-            modal.classList.add('hidden');
-            modal.querySelector('form').reset();
+            if (modal) {
+                modal.classList.add('hidden');
+                modal.querySelector('form')?.reset();
+            }
         }
 
-        document.getElementById('add-project-btn').onclick = () => openModal(addProjectModal);
-        document.getElementById('add-issue-btn').onclick = () => openModal(addIssueModal);
-        document.getElementById('cancel-project-btn').onclick = () => closeModal(addProjectModal);
-        document.getElementById('cancel-issue-btn').onclick = () => closeModal(addIssueModal);
+        document.getElementById('add-project-btn')?.addEventListener('click', () => openModal(addProjectModal));
+        document.getElementById('add-issue-btn')?.addEventListener('click', () => openModal(addIssueModal));
+        document.getElementById('cancel-project-btn')?.addEventListener('click', () => closeModal(addProjectModal));
+        document.getElementById('cancel-issue-btn')?.addEventListener('click', () => closeModal(addIssueModal));
 
         // --- Form Submissions ---
-        document.getElementById('add-project-form').addEventListener('submit', async e => {
+        document.getElementById('add-project-form')?.addEventListener('submit', async e => {
             e.preventDefault();
             try {
                 const startDate = document.getElementById('new-project-startDate').value;
@@ -1103,29 +1169,21 @@
                 };
 
                 const { data: newProject, error } = await supabase.from('projects').insert(insertData).select('id').single();
-                if (error) {
-                    showToast(`Error adding project: ${error.message}`, 'error');
-                    return;
-                }
+                if (error) throw error;
 
-                // Insert assignees
                 if (assignedToIds.length > 0) {
                     const assigneeInserts = assignedToIds.map(userId => ({
                         project_id: newProject.id,
                         user_id: userId
                     }));
                     const { error: assigneeError } = await supabase.from('project_assignees').insert(assigneeInserts);
-                    if (assigneeError) {
-                        showToast(`Error adding assignees: ${assigneeError.message}`, 'error');
-                        return;
-                    }
+                    if (assigneeError) throw assigneeError;
                 }
 
-                // Insert default schedule statuses for each date
                 if (startDate && endDate) {
+                    const scheduleInserts = [];
                     let currentDate = new Date(startDate);
                     const end = new Date(endDate);
-                    const scheduleInserts = [];
                     const { data: defaultStatus } = await supabase.from('statuses').select('id').eq('name', 'Yet to Start').single();
                     while (currentDate <= end) {
                         scheduleInserts.push({
@@ -1136,24 +1194,19 @@
                         currentDate.setDate(currentDate.getDate() + 1);
                     }
                     const { error: scheduleError } = await supabase.from('schedule_status').insert(scheduleInserts);
-                    if (scheduleError) {
-                        showToast(`Error adding schedule statuses: ${scheduleError.message}`, 'error');
-                        return;
-                    }
+                    if (scheduleError) throw scheduleError;
                 }
-
                 closeModal(addProjectModal);
                 showToast('Project added successfully!');
                 renderAllTabs();
             } catch (e) {
-                showToast('Error adding project', 'error');
-                console.error(e);
+                showToast('Error adding project: ' + e.message, 'error');
+                console.error('Add project error:', e);
             }
         });
 
-        document.getElementById('submit-project-btn').onclick = () => document.getElementById('add-project-form').requestSubmit();
-
-        document.getElementById('add-issue-form').addEventListener('submit', async e => {
+        document.getElementById('submit-project-btn')?.addEventListener('click', () => document.getElementById('add-project-form')?.requestSubmit());
+        document.getElementById('add-issue-form')?.addEventListener('submit', async e => {
             e.preventDefault();
             try {
                 const projectName = document.getElementById('new-issue-project-name').value;
@@ -1166,21 +1219,18 @@
                     pc,
                     issue
                 });
-                if (error) {
-                    showToast(`Error adding issue: ${error.message}`, 'error');
-                    return;
-                }
+                if (error) throw error;
 
                 closeModal(addIssueModal);
                 showToast('Issue added successfully!');
                 renderAllTabs();
             } catch (e) {
-                showToast('Error adding issue', 'error');
-                console.error(e);
+                showToast('Error adding issue: ' + e.message, 'error');
+                console.error('Add issue error:', e);
             }
         });
 
-        document.getElementById('submit-issue-btn').onclick = () => document.getElementById('add-issue-form').requestSubmit();
+        document.getElementById('submit-issue-btn')?.addEventListener('click', () => document.getElementById('add-issue-form')?.requestSubmit());
 
         // --- Populate Modal Dropdowns ---
         async function populateModalDropdowns() {
@@ -1190,28 +1240,36 @@
                 const subPhaseSelect = document.getElementById('new-project-subphase');
                 const issueProjectSelect = document.getElementById('new-issue-project-name');
 
-                assignedToSelect.innerHTML = '';
-                (await fetchUsers()).forEach(user => {
-                    assignedToSelect.innerHTML += `<option value="${user.name}">${user.name}</option>`;
-                });
+                if (assignedToSelect) {
+                    assignedToSelect.innerHTML = '';
+                    (await fetchUsers()).forEach(user => {
+                        assignedToSelect.innerHTML += `<option value="${user.name}">${user.name}</option>`;
+                    });
+                }
 
-                statusSelect.innerHTML = '<option value="" disabled selected>Status</option>';
-                (await fetchStatuses()).filter(s => s !== 'Completed').forEach(status => {
-                    statusSelect.innerHTML += `<option value="${status}">${status}</option>`;
-                });
+                if (statusSelect) {
+                    statusSelect.innerHTML = '<option value="" disabled selected>Status</option>';
+                    (await fetchStatuses()).filter(s => s !== 'Completed').forEach(status => {
+                        statusSelect.innerHTML += `<option value="${status}">${status}</option>`;
+                    });
+                }
 
-                subPhaseSelect.innerHTML = '<option value="" disabled selected>Sub Phase</option>';
-                (await fetchSubPhases()).forEach(phase => {
-                    subPhaseSelect.innerHTML += `<option value="${phase}">${phase}</option>`;
-                });
+                if (subPhaseSelect) {
+                    subPhaseSelect.innerHTML = '<option value="" disabled selected>Sub Phase</option>';
+                    (await fetchSubPhases()).forEach(phase => {
+                        subPhaseSelect.innerHTML += `<option value="${phase}">${phase}</option>`;
+                    });
+                }
 
-                issueProjectSelect.innerHTML = '<option value="" disabled selected>Project</option>';
-                (await fetchProjects()).map(p => p.project).sort().forEach(project => {
-                    issueProjectSelect.innerHTML += `<option value="${project}">${project}</option>`;
-                });
+                if (issueProjectSelect) {
+                    issueProjectSelect.innerHTML = '<option value="" disabled selected>Project</option>';
+                    (await fetchProjects()).map(p => p.project).sort().forEach(project => {
+                        issueProjectSelect.innerHTML += `<option value="${project}">${project}</option>`;
+                    });
+                }
             } catch (e) {
-                showToast('Error loading dropdowns', 'error');
-                console.error(e);
+                showToast('Error loading dropdowns: ' + e.message, 'error');
+                console.error('Populate modal dropdowns error:', e);
             }
         }
 
@@ -1234,8 +1292,8 @@
 
                 renderAllTabs();
             } catch (e) {
-                showToast('Error switching tab', 'error');
-                console.error(e);
+                showToast('Error switching tab: ' + e.message, 'error');
+                console.error('Switch tab error:', e);
             }
         }
 
@@ -1249,9 +1307,32 @@
                     renderSummary()
                 ]);
             } catch (e) {
-                showToast('Error rendering tabs', 'error');
-                console.error(e);
+                showToast('Error rendering tabs: ' + e.message, 'error');
+                console.error('Render all tabs error:', e);
             }
+        }
+
+        // --- Load html2canvas with Retry ---
+        async function loadHtml2Canvas(retryCount = 3, delay = 1000) {
+            if (window.html2canvas) {
+                init();
+                return;
+            }
+            const script = document.createElement('script');
+            script.src = "https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js";
+            script.async = true;
+            script.onload = init;
+            script.onerror = async () => {
+                if (retryCount > 0) {
+                    showToast(`Retrying html2canvas load (${retryCount} attempts left)`, 'error');
+                    await new Promise(resolve => setTimeout(resolve, delay));
+                    loadHtml2Canvas(retryCount - 1, delay * 2);
+                } else {
+                    showToast('Failed to load html2canvas after retries', 'error');
+                    init(); // Proceed without html2canvas
+                }
+            };
+            document.body.appendChild(script);
         }
 
         // --- Initialization ---
@@ -1262,37 +1343,9 @@
                     tab.addEventListener('click', switchTab);
                 });
 
-                document.getElementById('toggle-edit-mode').addEventListener('click', () => {
+                document.getElementById('toggle-edit-mode')?.addEventListener('click', () => {
                     isEditMode = !isEditMode;
-                    document.getElementById('edit-mode-text').textContent = isEditMode ? 'View Mode' : 'Toggle Edit Mode';
-                    document.getElementById('toggle-edit-mode').classList.toggle('bg-yellow-500', isEditMode);
-                    document.getElementById('toggle-edit-mode').classList.toggle('hover:bg-yellow-600', isEditMode);
-                    document.getElementById('toggle-edit-mode').classList.toggle('bg-blue-600', !isEditMode);
-                    document.getElementById('toggle-edit-mode').classList.toggle('hover:bg-blue-700', !isEditMode);
-                    applyEditMode();
-                    showToast(`Edit mode ${isEditMode ? 'enabled' : 'disabled'}`);
-                });
-
-                document.getElementById('tab-content').addEventListener('blur', handleFieldUpdate, true);
-                document.getElementById('tab-content').addEventListener('change', handleFieldUpdate, true);
-                document.getElementById('schedule-date-filter').addEventListener('change', renderWorkSchedule);
-                document.getElementById('schedule-qa-filter').addEventListener('change', renderWorkSchedule);
-                document.getElementById('copy-tracker-report').addEventListener('click', copyTrackerReport);
-                document.getElementById('copy-schedule-report').addEventListener('click', copyScheduleReport);
-
-                await renderAllTabs();
-            } catch (e) {
-                showToast('Initialization failed', 'error');
-                console.error(e);
-            }
-        }
-
-        const script = document.createElement('script');
-        script.src = "https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js";
-        script.onload = init;
-        script.onerror = () => showToast('Failed to load html2canvas', 'error');
-        document.body.appendChild(script);
-    });
-    </script>
-</body>
-</html>
+                    const toggleButton = document.getElementById('toggle-edit-mode');
+                    const editModeText = document.getElementById('edit-mode-text');
+                    if (toggleButton && editModeText) {
+                        editModeText.textContent = isEditMode ? 'View Mode' : 'Toggle Edit Mode';
