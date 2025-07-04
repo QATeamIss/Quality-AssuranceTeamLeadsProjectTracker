@@ -333,7 +333,7 @@
             try {
                 supabase = window.supabase.createClient(
                     'https://xwrdvdjzmoeeakriqdit.supabase.co',
-                    'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inh3cmR2ZGp6bW9lZWFrcmlxZGl0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTA4MzQ3NTYsImV4cCI6MjA2NjY0MTA3NTZ9.3vVZtjg70gKz4eKqDybHoV1yWYIWbxJe36ObszVMit0'
+                    'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inh3cmR2ZGp6bW9lZWFrcmlxZGl0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTA4MzQ3NTYsImV4cCI6MjA2NjQxMDc1Nn0.3vVZtjg70gKz4eKqDybHoV1yWYIWbxJe36ObszVMit0'
                 );
                 const { data, error } = await Promise.race([
                     supabase.from('projects').select('id').limit(1),
