@@ -327,7 +327,7 @@
         document.addEventListener('DOMContentLoaded', async () => {
             // --- Initialize Supabase Client ---
             let supabase;
-            const currentTime = new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' }); // 05:00 PM IST, July 04, 2025
+            const currentTime = new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' }); // 04:11 PM IST, July 04, 2025
             console.log(`[${currentTime}] Starting dashboard initialization`);
 
             try {
@@ -615,7 +615,9 @@
                             <td class="px-6 py-4 editable" data-table="projects" data-id="${proj.id}" data-field="project">${proj.project}</td>
                             <td class="px-6 py-4 editable" data-table="projects" data-id="${proj.id}" data-field="subPhase" data-type="select">${proj.subPhase}</td>
                             <td class="px-6 py-4 editable" data-table="projects" data-id="${proj.id}" data-field="assignedTo" data-type="select-multiple">${proj.assignedTo}</td>
-                            <td class="px-6 py-4 editable" data-table="projects" data-id="${proj.id}" data-field="status" data-type="select"><span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${getStatusColor(proj.status)}">${proj.status}</span></td>
+                            <td class="px-6 py-4">
+                                <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${getStatusColor(proj.status)} editable" data-table="projects" data-id="${proj.id}" data-field="status" data-type="select">${proj.status}</span>
+                            </td>
                             <td class="px-6 py-4 editable" data-table="projects" data-id="${proj.id}" data-field="startDate" data-type="date">${proj.startDate || ''}</td>
                             <td class="px-6 py-4 editable" data-table="projects" data-id="${proj.id}" data-field="endDate" data-type="date">${proj.endDate || ''}</td>
                             <td class="px-6 py-4 editable" data-table="projects" data-id="${proj.id}" data-field="actualCompDate" data-type="date">${proj.actualCompDate || ''}</td>
@@ -979,34 +981,31 @@
 
             // --- Edit Mode Functions ---
             function applyEditMode() {
-                document.querySelectorAll('.editable').forEach(async el => {
+                document.querySelectorAll('.editable').forEach(el => {
                     if (!el) return;
-                    // Exit edit mode: revert to span/text
                     if (!isEditMode) {
-                        if (el.tagName === 'SELECT' || el.querySelector('input')) {
+                        if (el.tagName === 'SELECT' || (el.tagName === 'SPAN' && el.querySelector('input'))) {
                             const span = document.createElement('span');
                             span.className = el.className;
-                            span.textContent = el.multiple
-                                ? Array.from(el.selectedOptions).map(opt => opt.value).join(', ')
-                                : el.value || el.querySelector('input')?.value || el.textContent;
+                            span.textContent = el.value || el.querySelector('input')?.value || el.textContent;
                             for (const key in el.dataset) span.dataset[key] = el.dataset[key];
                             el.replaceWith(span);
                         }
                         el.removeAttribute('contenteditable');
                     } else {
-                        // Enter edit mode: replace with input/select as needed
                         if (el.tagName === 'SPAN' && !el.querySelector('input') && !el.querySelector('select')) {
                             if (el.dataset.type === 'select') {
                                 const select = document.createElement('select');
                                 select.className = `${el.className} p-1 border rounded w-full`;
                                 for (const key in el.dataset) select.dataset[key] = el.dataset[key];
-                                const options = await getOptionsForField(el.dataset.table, el.dataset.field);
-                                options.forEach(opt => {
-                                    const option = document.createElement('option');
-                                    option.value = typeof opt === 'string' ? opt : opt.name;
-                                    option.textContent = typeof opt === 'string' ? opt : opt.name;
-                                    if (option.value === el.textContent) option.selected = true;
-                                    select.appendChild(option);
+                                getOptionsForField(el.dataset.table, el.dataset.field).then(options => {
+                                    options.forEach(opt => {
+                                        const option = document.createElement('option');
+                                        option.value = opt;
+                                        option.textContent = opt;
+                                        if (opt === el.textContent) option.selected = true;
+                                        select.appendChild(option);
+                                    });
                                 });
                                 el.replaceWith(select);
                             } else if (el.dataset.type === 'select-multiple') {
@@ -1014,14 +1013,14 @@
                                 select.multiple = true;
                                 select.className = `${el.className} p-1 border rounded w-full`;
                                 for (const key in el.dataset) select.dataset[key] = el.dataset[key];
-                                const options = await getOptionsForField(el.dataset.table, el.dataset.field);
-                                const selected = el.textContent.split(',').map(s => s.trim());
-                                options.forEach(opt => {
-                                    const option = document.createElement('option');
-                                    option.value = typeof opt === 'string' ? opt : opt.name;
-                                    option.textContent = typeof opt === 'string' ? opt : opt.name;
-                                    if (selected.includes(option.value)) option.selected = true;
-                                    select.appendChild(option);
+                                getOptionsForField(el.dataset.table, el.dataset.field).then(options => {
+                                    options.forEach(opt => {
+                                        const option = document.createElement('option');
+                                        option.value = opt.name;
+                                        option.textContent = opt.name;
+                                        if (el.textContent.split(', ').includes(opt.name)) option.selected = true;
+                                        select.appendChild(option);
+                                    });
                                 });
                                 el.replaceWith(select);
                             } else if (el.dataset.type === 'date') {
@@ -1043,7 +1042,7 @@
                                 el.innerHTML = '';
                                 el.appendChild(input);
                                 input.focus();
-                            } else {  
+                            } else {
                                 el.setAttribute('contenteditable', true);
                                 el.focus();
                             }
@@ -1085,13 +1084,7 @@
                 const id = editable.dataset.id;
                 const projectId = editable.dataset.projectId;
                 const date = editable.dataset.date;
-                const field = editable.dataset.field; // Ensure this is defined
-                if (!field) {
-                    console.error(`[${currentTime}] Missing data-field attribute on editable element`, editable);
-                    showToast('Invalid field update attempted. Check element configuration.', 'error');
-                    return;
-                }
-
+                const field = editable.dataset.field;
                 let value = isSelect ? (editable.multiple ? Array.from(editable.selectedOptions).map(opt => opt.value) : editable.value) : isInput ? editable.value : editable.textContent.trim();
 
                 if (!value && !['actualCompDate', 'startDate', 'endDate', 'comments', 'deviationReason'].includes(field)) {
@@ -1141,8 +1134,6 @@
                             updateData[field] = value === 'Yes';
                         } else if (field === 'bugCount') {
                             updateData[field] = parseInt(value) || 0;
-                        } else if (['startDate', 'endDate', 'actualCompDate'].includes(field)) {
-                            updateData[field] = value || null;
                         } else {
                             updateData[field.toLowerCase()] = value || null;
                         }
@@ -1408,7 +1399,7 @@
                 if (activeTab === 'tracker') await renderProjectTracker();
                 else if (activeTab === 'schedule') await renderWorkSchedule();
                 else if (activeTab === 'coordinator') await renderIssuesLog();
-                else if (activeTab === 'summary') renderSummary();
+                else if (activeTab === 'summary') await renderSummary();
             }
 
             // --- Event Listeners ---
@@ -1461,24 +1452,10 @@
                 }
             }, true);
 
-            // --- Initial Render ---
+            // --- Initial Render
             switchTab('tracker'); // Default to Tracker tab
-            console.log(`[${new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}] Dashboard initialized successfully`); // 05:05 PM IST, July 04, 2025
+            console.log(`[${new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}] Dashboard initialized successfully`);
         });
-
-        // --- Error Handling for Uncaught Exceptions ---
-        window.addEventListener('error', (e) => {
-            const errorTime = new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' });
-            console.error(`[${errorTime}] Uncaught error:`, e.message, e.filename, e.lineno);
-            showToast(`An error occurred at ${errorTime}: ${emessage}. Check console for details.`, 'error');
-    });
-
-    // --- Cleanup on Unload ---
-    window.addEventListener('beforeunload', () => {
-        const unloadTime = new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' });
-        console.log(`[${unloadTime}] Dashboard unloading...`);
-        // Optional: Save any pending changes if needed
-    });
-</script>
+    </script>
 </body>
 </html>
