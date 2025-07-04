@@ -147,6 +147,11 @@
                                 <th class="px-6 py-3">Status</th>
                                 <th class="px-6 py-3">Start Date</th>
                                 <th class="px-6 py-3">End Date</th>
+                                <th class="px-6 py-3">Actual Comp. Date</th>
+                                <th class="px-6 py-3">Comments</th>
+                                <th class="px-6 py-3">Bug Count</th>
+                                <th class="px-6 py-3">Deviated?</th>
+                                <th class="px-6 py-3">Deviation Reason</th>
                             </tr>
                         </thead>
                         <tbody id="project-tracker-body"></tbody>
@@ -245,15 +250,15 @@
                     <form id="add-project-form" class="space-y-4">
                         <input class="w-full px-3 py-2 text-gray-700 border rounded-lg focus:outline-none" type="text" id="new-project-name" placeholder="Project Name" required>
                         <select id="new-project-subphase" class="w-full px-3 py-2 text-gray-700 border rounded-lg focus:outline-none" required></select>
+                        <select id="new-project-assignedTo" multiple class="w-full px-3 py-2 text-gray-700 border rounded-lg focus:outline-none"></select>
+                        <select id="new-project-status" class="w-full px-3 py-2 text-gray-700 border rounded-lg focus:outline-none" required></select>
                         <div class="flex gap-4">
                             <input class="w-1/2 px-3 py-2 text-gray-700 border rounded-lg focus:outline-none" type="date" id="new-project-startDate">
                             <input class="w-1/2 px-3 py-2 text-gray-700 border rounded-lg focus:outline-none" type="date" id="new-project-endDate">
                         </div>
-                        <select id="new-project-assignedTo" class="w-full px-3 py-2 text-gray-700 border rounded-lg focus:outline-none" required></select>
-                        <select id="new-project-status" class="w-full px-3 py-2 text-gray-700 border rounded-lg focus:outline-none" required></select>
                     </form>
                 </div>
-                <div class="items-center px-4 py-3">
+                <div class="items-center px вооружение-4 py-3">
                     <button id="submit-project-btn" class="px-4 py-2 bg-blue-500 text-white text-base font-medium rounded-md w-full shadow-sm hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-300">
                         Add Project
                     </button>
@@ -332,9 +337,8 @@
             const { data, error } = await supabase
                 .from('projects')
                 .select(`
-                    id, project, start_date, end_date, actual_comp_date,
+                    id, project, start_date, end_date, actual_comp_date, comments, bug_count, deviated, deviation_reason,
                     sub_phases(name),
-                    users!assigned_to_id(name),
                     statuses(name)
                 `);
             if (error) {
@@ -342,16 +346,33 @@
                 console.error(error);
                 return [];
             }
-            return data.map(p => ({
-                id: p.id,
-                project: p.project,
-                subPhase: p.sub_phases?.name || '',
-                assignedTo: p.users?.name || '',
-                status: p.statuses?.name || '',
-                startDate: p.start_date,
-                endDate: p.end_date,
-                actualCompDate: p.actual_comp_date
+            // Fetch assignees for each project
+            const projectsWithAssignees = await Promise.all(data.map(async (p) => {
+                const { data: assignees, error: assigneeError } = await supabase
+                    .from('project_assignees')
+                    .select('users(name)')
+                    .eq('project_id', p.id);
+                if (assigneeError) {
+                    console.error(assigneeError);
+                    return { ...p, assignedTo: [] };
+                }
+                return {
+                    id: p.id,
+                    project: p.project,
+                    subPhase: p.sub_phases?.name || '',
+                    assignedTo: assignees.map(a => a.users?.name || '').filter(Boolean).join(', '),
+                    assignedToArray: assignees.map(a => a.users?.name || '').filter(Boolean),
+                    status: p.statuses?.name || '',
+                    startDate: p.start_date,
+                    endDate: p.end_date,
+                    actualCompDate: p.actual_comp_date,
+                    comments: p.comments || '',
+                    bugCount: p.bug_count || 0,
+                    deviated: p.deviated ? 'Yes' : 'No',
+                    deviationReason: p.deviation_reason || ''
+                };
             }));
+            return projectsWithAssignees;
         }
 
         async function fetchScheduleStatuses() {
@@ -450,39 +471,39 @@
         }
 
         async function fetchUsers() {
-            const { data, error } = await supabase.from('users').select('name');
+            const { data, error } = await supabase.from('users').select('id, name').order('name');
             if (error) {
                 showToast('Error fetching users: ' + error.message, 'error');
                 console.error(error);
                 return [];
             }
-            return data.map(u => u.name).sort();
+            return data.map(u => ({ id: u.id, name: u.name }));
         }
 
         async function fetchStatuses() {
-            const { data, error } = await supabase.from('statuses').select('name');
+            const { data, error } = await supabase.from('statuses').select('name').order('name');
             if (error) {
                 showToast('Error fetching statuses: ' + error.message, 'error');
                 console.error(error);
                 return [];
             }
-            return data.map(s => s.name).sort();
+            return data.map(s => s.name);
         }
 
         async function fetchSubPhases() {
-            const { data, error } = await supabase.from('sub_phases').select('name');
+            const { data, error } = await supabase.from('sub_phases').select('name').order('name');
             if (error) {
                 showToast('Error fetching sub phases: ' + error.message, 'error');
                 console.error(error);
                 return [];
             }
-            return data.map(sp => sp.name).sort();
+            return data.map(sp => sp.name);
         }
 
         // --- Render Functions ---
         async function renderProjectTracker() {
             const tbody = document.getElementById('project-tracker-body');
-            tbody.innerHTML = '<tr><td colspan="6" class="text-center py-4">Loading...</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="11" class="text-center py-4">Loading...</td></tr>';
             try {
                 const projects = (await fetchProjects()).filter(p => !['Completed', 'Rejected'].includes(p.status));
                 tbody.innerHTML = '';
@@ -492,17 +513,30 @@
                     row.innerHTML = `
                         <td class="px-6 py-4 editable" data-table="projects" data-id="${proj.id}" data-field="project">${proj.project}</td>
                         <td class="px-6 py-4 editable" data-table="projects" data-id="${proj.id}" data-field="subPhase" data-type="select">${proj.subPhase}</td>
-                        <td class="px-6 py-4 editable" data-table="projects" data-id="${proj.id}" data-field="assignedTo" data-type="select">${proj.assignedTo}</td>
+                        <td class="px-6 py-4 editable" data-table="projects" data-id="${proj.id}" data-field="assignedTo" data-type="select-multiple">${proj.assignedTo}</td>
                         <td class="px-6 py-4">
                             <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${getStatusColor(proj.status)} editable" data-table="projects" data-id="${proj.id}" data-field="status" data-type="select">${proj.status}</span>
                         </td>
                         <td class="px-6 py-4 editable" data-table="projects" data-id="${proj.id}" data-field="startDate" data-type="date">${proj.startDate || ''}</td>
                         <td class="px-6 py-4 editable" data-table="projects" data-id="${proj.id}" data-field="endDate" data-type="date">${proj.endDate || ''}</td>
+                        <td class="px-6 py-4 editable" data-table="projects" data-id="${proj.id}" data-field="actualCompDate" data-type="date">${proj.actualCompDate || ''}</td>
+                        <td class="px-6 py-4 editable" data-table="projects" data-id="${proj.id}" data-field="comments">${proj.comments}</td>
+                        <td class="px-6 py-4 editable" data-table="projects" data-id="${proj.id}" data-field="bugCount" data-type="number">${proj.bugCount}</td>
+                        <td class="px-6 py-4 editable" data-table="projects" data-id="${proj.id}" data-field="deviated" data-type="select">${proj.deviated}</td>
+                        <td class="px-6 py-4 editable ${proj.deviated === 'Yes' ? '' : 'hidden'}" data-table="projects" data-id="${proj.id}" data-field="deviationReason">${proj.deviationReason}</td>
                     `;
                     tbody.appendChild(row);
                 });
+                // Add event listeners for deviated field to toggle deviation reason
+                document.querySelectorAll('[data-field="deviated"]').forEach(select => {
+                    select.addEventListener('change', (e) => {
+                        const row = e.target.closest('tr');
+                        const reasonCell = row.querySelector('[data-field="deviationReason"]');
+                        reasonCell.classList.toggle('hidden', e.target.value !== 'Yes');
+                    });
+                });
             } catch (e) {
-                tbody.innerHTML = '<tr><td colspan="6" class="text-center py-4 text-red-600">Error loading projects</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="11" class="text-center py-4 text-red-600">Error loading projects</td></tr>';
                 console.error(e);
             }
             applyEditMode();
@@ -517,7 +551,6 @@
                 const [projects, scheduleStatuses] = await Promise.all([fetchProjects(), fetchScheduleStatuses()]);
                 const scheduleItems = [];
 
-                // Create schedule items based on project dates
                 projects.forEach(proj => {
                     if (!proj.startDate || !proj.endDate) return;
                     let currentDate = new Date(proj.startDate);
@@ -539,7 +572,7 @@
 
                 let filteredItems = scheduleItems;
                 if (filterDate) filteredItems = filteredItems.filter(item => item.date === filterDate);
-                if (filterQA) filteredItems = filteredItems.filter(item => item.assignedTo === filterQA);
+                if (filterQA) filteredItems = filteredItems.filter(item => item.assignedTo.includes(filterQA));
 
                 const groupedByDate = {};
                 filteredItems.forEach(item => {
@@ -583,11 +616,11 @@
                     container.appendChild(dateSection);
                 });
 
-                // Update QA filter options
                 const qaSelect = document.getElementById('schedule-qa-filter');
                 const currentQA = qaSelect.value;
                 qaSelect.innerHTML = '<option value="">All QA</option>';
-                [...new Set(projects.map(p => p.assignedTo))].sort().forEach(qa => {
+                const allQAs = [...new Set(projects.flatMap(p => p.assignedToArray))].sort();
+                allQAs.forEach(qa => {
                     const option = document.createElement('option');
                     option.value = qa;
                     option.textContent = qa;
@@ -595,7 +628,6 @@
                     qaSelect.appendChild(option);
                 });
 
-                // Update date filter options
                 const dateSelect = document.getElementById('schedule-date-filter');
                 const currentDate = dateSelect.value;
                 dateSelect.innerHTML = '<option value="">All Dates</option>';
@@ -619,7 +651,7 @@
             let text = 'Project Tracker Report:\n';
             Array.from(tbody.querySelectorAll('tr')).forEach(row => {
                 const cells = row.querySelectorAll('td');
-                text += `Project: ${cells[0].textContent}, Sub Phase: ${cells[1].textContent}, Assigned To: ${cells[2].textContent}, Status: ${cells[3].textContent}, Start: ${cells[4].textContent}, End: ${cells[5].textContent}\n`;
+                text += `Project: ${cells[0].textContent}, Sub Phase: ${cells[1].textContent}, Assigned To: ${cells[2].textContent}, Status: ${cells[3].textContent}, Start: ${cells[4].textContent}, End: ${cells[5].textContent}, Actual Comp.: ${cells[6].textContent}, Comments: ${cells[7].textContent}, Bug Count: ${cells[8].textContent}, Deviated: ${cells[9].textContent}, Deviation Reason: ${cells[10].textContent}\n`;
             });
             try {
                 const table = tbody.closest('table');
@@ -808,10 +840,35 @@
                                 });
                             });
                             el.replaceWith(select);
+                        } else if (el.dataset.type === 'select-multiple') {
+                            const select = document.createElement('select');
+                            select.multiple = true;
+                            select.className = `${el.className} p-1 border rounded w-full`;
+                            for conjuntos de datos (const key in el.dataset) select.dataset[key] = el.dataset[key];
+                            getOptionsForField(el.dataset.table, el.dataset.field).then(options => {
+                                options.forEach(opt => {
+                                    const option = document.createElement('option');
+                                    option.value = opt.name;
+                                    option.textContent = opt.name;
+                                    if (el.textContent.split(', ').includes(opt.name)) option.selected = true;
+                                    select.appendChild(option);
+                                });
+                            });
+                            el.replaceWith(select);
                         } else if (el.dataset.type === 'date') {
                             const input = document.createElement('input');
                             input.type = 'date';
                             input.value = el.textContent || '';
+                            input.className = 'p-1 border rounded w-full';
+                            for (const key in el.dataset) input.dataset[key] = el.dataset[key];
+                            el.innerHTML = '';
+                            el.appendChild(input);
+                            input.focus();
+                        } else if (el.dataset.type === 'number') {
+                            const input = document.createElement('input');
+                            input.type = 'number';
+                            input.min = '0';
+                            input.value = el.textContent || '0';
                             input.className = 'p-1 border rounded w-full';
                             for (const key in el.dataset) input.dataset[key] = el.dataset[key];
                             el.innerHTML = '';
@@ -834,6 +891,7 @@
                 const projects = await fetchProjects();
                 return [...new Set(projects.map(p => p.project))].sort();
             }
+            if (field === 'deviated') return ['Yes', 'No'];
             return [];
         }
 
@@ -841,7 +899,7 @@
             if (!isEditMode) return;
             const target = e.target;
             const isSelect = target.tagName === 'SELECT';
-            const isInput = target.tagName === 'INPUT' && target.type === 'date';
+            const isInput = target.tagName === 'INPUT' && (target.type === 'date' || target.type === 'number');
             const isContentEditable = target.isContentEditable;
             if (!isSelect && !isInput && !isContentEditable) return;
 
@@ -853,9 +911,9 @@
             const projectId = editable.dataset.projectId;
             const date = editable.dataset.date;
             const field = editable.dataset.field;
-            let value = isSelect ? target.value : isInput ? target.value : target.textContent.trim();
+            let value = isSelect ? (editable.multiple ? Array.from(editable.selectedOptions).map(opt => opt.value) : editable.value) : isInput ? editable.value : editable.textContent.trim();
 
-            if (!value && !['actualCompDate', 'startDate', 'endDate'].includes(field)) {
+            if (!value && !['actualCompDate', 'startDate', 'endDate', 'comments', 'deviationReason'].includes(field)) {
                 showToast('Field cannot be empty', 'error');
                 return;
             }
@@ -867,10 +925,8 @@
                     let error;
 
                     if (id) {
-                        // Update existing schedule status
                         ({ error } = await supabase.from('schedule_status').update({ status_id: status?.id }).eq('id', id));
                     } else {
-                        // Insert new schedule status
                         ({ error } = await supabase.from('schedule_status').insert(updateData));
                     }
 
@@ -885,23 +941,42 @@
                     if (field === 'subPhase') {
                         const { data: subPhase } = await supabase.from('sub_phases').select('id').eq('name', value).single();
                         updateData['sub_phase_id'] = subPhase?.id;
-                    } else if (field === 'assignedTo' || field === 'resource') {
-                        const { data: user } = await supabase.from('users').select('id').eq('name', value).single();
-                        updateData[field === 'assignedTo' ? 'assigned_to_id' : 'resource_id'] = user?.id;
+                    } else if (field === 'assignedTo') {
+                        // Delete existing assignees
+                        await supabase.from('project_assignees').delete().eq('project_id', id);
+                        // Insert new assignees
+                        if (value.length > 0) {
+                            const users = await fetchUsers();
+                            const assigneeInserts = value.map(name => {
+                                const user = users.find(u => u.name === name);
+                                return { project_id: id, user_id: user?.id };
+                            }).filter(Boolean);
+                            const { error: assigneeError } = await supabase.from('project_assignees').insert(assigneeInserts);
+                            if (assigneeError) {
+                                showToast(`Error updating assignees: ${assigneeError.message}`, 'error');
+                                return;
+                            }
+                        }
                     } else if (field === 'status') {
                         const { data: status } = await supabase.from('statuses').select('id').eq('name', value).single();
                         updateData['status_id'] = status?.id;
                     } else if (field === 'project' || field === 'projectName') {
                         const { data: project } = await supabase.from('projects').select('id').eq('project', value).single();
                         updateData['project_id'] = project?.id;
+                    } else if (field === 'deviated') {
+                        updateData[field] = value === 'Yes';
+                    } else if (field === 'bugCount') {
+                        updateData[field] = parseInt(value) || 0;
                     } else {
                         updateData[field.toLowerCase()] = value || null;
                     }
 
-                    const { error } = await supabase.from(table).update(updateData).eq('id', id);
-                    if (error) {
-                        showToast(`Error updating ${field}: ${error.message}`, 'error');
-                        return;
+                    if (Object.keys(updateData).length > 0) {
+                        const { error } = await supabase.from(table).update(updateData).eq('id', id);
+                        if (error) {
+                            showToast(`Error updating ${field}: ${error.message}`, 'error');
+                            return;
+                        }
                     }
 
                     if (table === 'projects' && field === 'status' && value === 'Completed') {
@@ -945,14 +1020,15 @@
                 if (existing.length > 0) return;
 
                 const { data: subPhase } = await supabase.from('sub_phases').select('id').eq('name', proj.subPhase).single();
-                const { data: user } = await supabase.from('users').select('id').eq('name', proj.assignedTo).single();
+                const users = await fetchUsers();
+                const assignedToIds = proj.assignedToArray.map(name => users.find(u => u.name === name)?.id).filter(Boolean);
                 const { data: status } = await supabase.from('statuses').select('id').eq('name', 'Completed').single();
 
                 const { error } = await supabase.from('qa_summary').insert({
                     project_id: project.id,
                     sub_phase_id: subPhase?.id,
-                    pc: (await fetchUsers())[0] || 'Unknown',
-                    assigned_to_id: user?.id,
+                    pc: (await fetchUsers())[0]?.name || 'Unknown',
+                    assigned_to_id: assignedToIds[0] || null, // Use first assignee for QA summary
                     status_id: status?.id,
                     start_date: proj.startDate,
                     end_date: proj.endDate,
@@ -1006,26 +1082,43 @@
                 }
 
                 const subPhaseName = document.getElementById('new-project-subphase').value;
-                const assignedToName = document.getElementById('new-project-assignedTo').value;
+                const assignedToNames = Array.from(document.getElementById('new-project-assignedTo').selectedOptions).map(opt => opt.value);
                 const statusName = document.getElementById('new-project-status').value;
 
                 const { data: subPhase } = await supabase.from('sub_phases').select('id').eq('name', subPhaseName).single();
-                const { data: user } = await supabase.from('users').select('id').eq('name', assignedToName).single();
+                const users = await fetchUsers();
+                const assignedToIds = assignedToNames.map(name => users.find(u => u.name === name)?.id).filter(Boolean);
                 const { data: status } = await supabase.from('statuses').select('id').eq('name', statusName).single();
 
                 const insertData = {
                     project: projectName,
                     sub_phase_id: subPhase?.id,
-                    assigned_to_id: user?.id,
                     status_id: status?.id,
                     start_date: startDate || null,
-                    end_date: endDate || null
+                    end_date: endDate || null,
+                    comments: '',
+                    bug_count: 0,
+                    deviated: false,
+                    deviation_reason: ''
                 };
 
                 const { data: newProject, error } = await supabase.from('projects').insert(insertData).select('id').single();
                 if (error) {
                     showToast(`Error adding project: ${error.message}`, 'error');
                     return;
+                }
+
+                // Insert assignees
+                if (assignedToIds.length > 0) {
+                    const assigneeInserts = assignedToIds.map(userId => ({
+                        project_id: newProject.id,
+                        user_id: userId
+                    }));
+                    const { error: assigneeError } = await supabase.from('project_assignees').insert(assigneeInserts);
+                    if (assigneeError) {
+                        showToast(`Error adding assignees: ${assigneeError.message}`, 'error');
+                        return;
+                    }
                 }
 
                 // Insert default schedule statuses for each date
@@ -1097,9 +1190,9 @@
                 const subPhaseSelect = document.getElementById('new-project-subphase');
                 const issueProjectSelect = document.getElementById('new-issue-project-name');
 
-                assignedToSelect.innerHTML = '<option value="" disabled selected>Assign To</option>';
+                assignedToSelect.innerHTML = '';
                 (await fetchUsers()).forEach(user => {
-                    assignedToSelect.innerHTML += `<option value="${user}">${user}</option>`;
+                    assignedToSelect.innerHTML += `<option value="${user.name}">${user.name}</option>`;
                 });
 
                 statusSelect.innerHTML = '<option value="" disabled selected>Status</option>';
@@ -1164,13 +1257,11 @@
         // --- Initialization ---
         async function init() {
             try {
-                // Bind tab event listeners
                 document.querySelectorAll('.tab-link').forEach(tab => {
-                    tab.removeEventListener('click', switchTab); // Prevent duplicate listeners
+                    tab.removeEventListener('click', switchTab);
                     tab.addEventListener('click', switchTab);
                 });
 
-                // Bind other event listeners
                 document.getElementById('toggle-edit-mode').addEventListener('click', () => {
                     isEditMode = !isEditMode;
                     document.getElementById('edit-mode-text').textContent = isEditMode ? 'View Mode' : 'Toggle Edit Mode';
@@ -1189,7 +1280,6 @@
                 document.getElementById('copy-tracker-report').addEventListener('click', copyTrackerReport);
                 document.getElementById('copy-schedule-report').addEventListener('click', copyScheduleReport);
 
-                // Initial render
                 await renderAllTabs();
             } catch (e) {
                 showToast('Initialization failed', 'error');
@@ -1197,7 +1287,6 @@
             }
         }
 
-        // --- Load html2canvas and initialize ---
         const script = document.createElement('script');
         script.src = "https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js";
         script.onload = init;
