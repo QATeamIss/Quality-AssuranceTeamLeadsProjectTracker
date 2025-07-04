@@ -1,3 +1,25 @@
+The error "Error updating undefined: undefined is not an object (evaluating 'field.toLowerCase')" indicates that the `field` variable in the `handleFieldUpdate` function is undefined when an attempt is made to call `toLowerCase()` on it. This likely occurs when an editable element lacks the `data-field` attribute, which happens if the DOM element's dataset is incomplete or improperly initialized, especially during edit mode updates. The issue arises in this block of code:
+
+```javascript
+else if (field === 'subPhase') {
+    // ... rest of the code
+} else {
+    updateData[field.toLowerCase()] = value || null;
+}
+```
+
+### Cause
+- The `editable` element might not have a `data-field` attribute set, possibly due to a mismatch in how elements are created or updated in `applyEditMode` or during dynamic rendering.
+- This could happen if a new element is added without proper dataset initialization or if an event is triggered on an element outside the expected structure.
+
+### Fix
+1. **Add a Check for `field`**: Ensure `field` is defined before processing it.
+2. **Improve Element Validation**: Verify that all editable elements have the required `data-field` attribute during initialization and updates.
+3. **Log Debugging Information**: Add logging to track the problematic element for better diagnostics.
+
+Here’s the corrected `handleFieldUpdate` function within the full HTML:
+
+```html
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -327,13 +349,13 @@
         document.addEventListener('DOMContentLoaded', async () => {
             // --- Initialize Supabase Client ---
             let supabase;
-            const currentTime = new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' }); // 04:11 PM IST, July 04, 2025
+            const currentTime = new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' }); // 04:44 PM IST, July 04, 2025
             console.log(`[${currentTime}] Starting dashboard initialization`);
 
             try {
                 supabase = window.supabase.createClient(
                     'https://xwrdvdjzmoeeakriqdit.supabase.co',
-                    'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inh3cmR2ZGp6bW9lZWFrcmlxZGl0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTA4MzQ3NTYsImV4cCI6MjA2NjQxMDc1Nn0.3vVZtjg70gKz4eKqDybHoV1yWYIWbxJe36ObszVMit0'
+                    'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inh3cmR2ZGp6bW9lZWFrcmlxZGl0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTA4MzQ3NTYsImV4cCI6MjA2NjY0MTA3NTZ9.3vVZtjg70gKz4eKqDybHoV1yWYIWbxJe36ObszVMit0'
                 );
                 const { data, error } = await Promise.race([
                     supabase.from('projects').select('id').limit(1),
@@ -1084,7 +1106,13 @@
                 const id = editable.dataset.id;
                 const projectId = editable.dataset.projectId;
                 const date = editable.dataset.date;
-                const field = editable.dataset.field;
+                const field = editable.dataset.field; // Ensure this is defined
+                if (!field) {
+                    console.error(`[${currentTime}] Missing data-field attribute on editable element`, editable);
+                    showToast('Invalid field update attempted. Check element configuration.', 'error');
+                    return;
+                }
+
                 let value = isSelect ? (editable.multiple ? Array.from(editable.selectedOptions).map(opt => opt.value) : editable.value) : isInput ? editable.value : editable.textContent.trim();
 
                 if (!value && !['actualCompDate', 'startDate', 'endDate', 'comments', 'deviationReason'].includes(field)) {
@@ -1135,7 +1163,7 @@
                         } else if (field === 'bugCount') {
                             updateData[field] = parseInt(value) || 0;
                         } else {
-                            updateData[field.toLowerCase()] = value || null;
+                            updateData[field.toLowerCase()] = value || null; // Safe to use toLowerCase now
                         }
 
                         if (Object.keys(updateData).length > 0) {
@@ -1452,9 +1480,22 @@
                 }
             }, true);
 
-            // --- Initial Render
+            // --- Initial Render ---
             switchTab('tracker'); // Default to Tracker tab
-            console.log(`[${new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}] Dashboard initialized successfully`);
+           console.log(`[${new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}] Dashboard initialized successfully`); // 04:52 PM IST, July 04, 2025
+        });
+
+        // --- Error Handling for Uncaught Exceptions ---
+        window.addEventListener('error', (e) => {
+            const errorTime = new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' });
+            console.error(`[${errorTime}] Uncaught error:`, e.message, e.filename, e.lineno);
+            showToast(`An error occurred at ${errorTime}: ${e.message}. Check console for details.`, 'error');
+        });
+
+        // --- Cleanup on Unload ---
+        window.addEventListener('beforeunload', () => {
+            const unloadTime = new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' });
+            console.log(`[${unloadTime}] Dashboard unloading...`);
         });
     </script>
 </body>
